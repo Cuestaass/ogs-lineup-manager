@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FC OGS · Organizador de fútbol 7</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">FC OGS</p>
+      <h1>Organizador de fútbol 7</h1>
+      <p>Gestiona cualquier número de equipos, alineaciones, dorsales y exportaciones.</p>
+    </div>
+    <div class="header-actions">
+      <button id="export-all-png" class="secondary">Exportar todos · PNG</button>
+      <button id="export-all-pdf" class="primary">Exportar todos · PDF</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel team-creator">
+      <div>
+        <h2>Equipos</h2>
+        <p>Crea desde un único equipo hasta todos los que necesites.</p>
+      </div>
+      <div class="inline-form">
+        <label>
+          <span>Nombre del nuevo equipo</span>
+          <input id="new-team-name" type="text" placeholder="Ej. FC OGS C" maxlength="40">
+        </label>
+        <button id="add-team" class="primary">Añadir equipo</button>
+      </div>
+    </section>
+
+    <section class="panel player-creator">
+      <div>
+        <h2>Nuevo jugador</h2>
+        <p>El dorsal se asigna automáticamente cuando se deja vacío.</p>
+      </div>
+      <div class="player-form-grid">
+        <label>
+          <span>Nombre</span>
+          <input id="new-player-name" type="text" placeholder="Nombre del jugador" maxlength="40">
+        </label>
+        <label>
+          <span>Dorsal opcional</span>
+          <input id="new-player-number" type="number" min="1" max="999" placeholder="Automático">
+        </label>
+        <fieldset id="new-player-teams" class="team-checkboxes">
+          <legend>Asignar a equipos</legend>
+        </fieldset>
+        <button id="add-player" class="primary">Añadir jugador</button>
+      </div>
+      <p id="feedback" class="feedback" aria-live="polite"></p>
+    </section>
+
+    <section class="summary-grid" id="summary-grid"></section>
+
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <h2>Jugadores</h2>
+          <p>Edita el dorsal, asigna un jugador a varios equipos o elimínalo.</p>
+        </div>
+        <button id="clear-all" class="danger ghost">Borrar todos los datos</button>
+      </div>
+      <div class="table-wrap">
+        <table class="players-table">
+          <thead>
+            <tr>
+              <th>Dorsal</th>
+              <th>Jugador</th>
+              <th>Equipos</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="players-body"></tbody>
+        </table>
+      </div>
+      <div id="players-empty" class="empty-state">Todavía no hay jugadores.</div>
+    </section>
+
+    <section>
+      <div class="section-heading teams-heading">
+        <div>
+          <h2>Alineaciones</h2>
+          <p>Arrastra jugadores entre el banquillo y el campo, o selecciónalos con un clic.</p>
+        </div>
+      </div>
+      <div id="teams-container" class="teams-grid"></div>
+    </section>
+  </main>
+
+  <template id="team-template">
+    <article class="team-card">
+      <div class="team-card-header">
+        <div class="team-title-block">
+          <input class="team-name-input" aria-label="Nombre del equipo" maxlength="40">
+          <p class="team-meta"></p>
+        </div>
+        <div class="team-controls">
+          <label>
+            <span>Formación</span>
+            <select class="formation-select">
+              <option value="321">3-2-1</option>
+              <option value="231">2-3-1</option>
+              <option value="222">2-2-2</option>
+              <option value="132">1-3-2</option>
+              <option value="312">3-1-2</option>
+            </select>
+          </label>
+          <button class="auto-lineup secondary">Alinear 7</button>
+          <button class="bench-all secondary">Todos al banquillo</button>
+        </div>
+      </div>
+
+      <div class="export-actions">
+        <button class="export-png secondary">Exportar PNG</button>
+        <button class="export-pdf primary">Exportar PDF</button>
+        <button class="delete-team danger ghost">Eliminar equipo</button>
+      </div>
+
+      <div class="pitch-export-area">
+        <div class="pitch" aria-label="Campo de fútbol 7">
+          <div class="line halfway"></div>
+          <div class="centre-circle"></div>
+          <div class="penalty-area top"></div>
+          <div class="penalty-area bottom"></div>
+          <div class="goal top"></div>
+          <div class="goal bottom"></div>
+          <div class="pitch-slot" data-slot="0"></div>
+          <div class="pitch-slot" data-slot="1"></div>
+          <div class="pitch-slot" data-slot="2"></div>
+          <div class="pitch-slot" data-slot="3"></div>
+          <div class="pitch-slot" data-slot="4"></div>
+          <div class="pitch-slot" data-slot="5"></div>
+          <div class="pitch-slot" data-slot="6"></div>
+        </div>
+        <div class="bench-section">
+          <div class="bench-heading">
+            <strong>Banquillo</strong>
+            <span class="bench-count"></span>
+          </div>
+          <div class="bench"></div>
+        </div>
+      </div>
+
+      <div class="team-list-section">
+        <h3>Lista del equipo</h3>
+        <ol class="team-roster-list"></ol>
+      </div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
