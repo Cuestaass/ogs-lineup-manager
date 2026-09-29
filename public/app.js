@@ -76,7 +76,9 @@
     exportAllPng: document.getElementById('export-all-png'),
     exportAllPdf: document.getElementById('export-all-pdf'),
     clearAll: document.getElementById('clear-all'),
-    importRosterFile: document.getElementById('import-roster-file')
+    importRosterFile: document.getElementById('import-roster-file'),
+    importRosterDropZone: document.getElementById('import-roster-drop-zone'),
+    importRosterFileName: document.getElementById('import-roster-file-name')
   };
 
   function loadState() {
@@ -270,10 +272,12 @@
       const teamName = teamRow?.records.find(record => teamLabel && record.x > teamLabel.x + 5)?.text.trim();
       if (!teamName) throw new Error('No he encontrado el nombre del equipo en la ficha.');
 
+      const documentHeader = rows.flatMap(row => row.records).find(record => /^documento$/i.test(record.text));
+      const documentColumnX = documentHeader?.x ?? 300;
       const names = rows.flatMap(row => {
         const role = row.records.find(record => /^deportista$/i.test(record.text));
         if (!role) return [];
-        const name = row.records.find(record => record.x > role.x + 20 && record.text.length > 2);
+        const name = row.records.find(record => record.x > role.x + 20 && record.x < documentColumnX && record.text.length > 2);
         return name ? [name.text.replace(/\s+/g, ' ').trim()] : [];
       }).filter(Boolean);
       if (!names.length) throw new Error('No he encontrado jugadores con el rol “Deportista”. Comprueba que el PDF contenga texto seleccionable.');
@@ -438,7 +442,24 @@
 
       const nameCell = document.createElement('td');
       nameCell.className = 'player-name-cell';
-      nameCell.textContent = player.name;
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.maxLength = 80;
+      nameInput.className = 'name-input';
+      nameInput.value = player.name;
+      nameInput.setAttribute('aria-label', `Nombre de ${player.name}`);
+      nameInput.addEventListener('change', () => {
+        const value = nameInput.value.trim();
+        if (!value) {
+          nameInput.value = player.name;
+          setFeedback('El nombre del jugador no puede estar vacío.');
+          return;
+        }
+        player.name = value;
+        saveState();
+        render();
+      });
+      nameCell.appendChild(nameInput);
 
       const teamsCell = document.createElement('td');
       const checks = document.createElement('div');
@@ -866,13 +887,46 @@
     }
   }
 
+  function handleRosterFile(file) {
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setFeedback('Selecciona un archivo PDF para importar la ficha.');
+      dom.importRosterFile.value = '';
+      return;
+    }
+    dom.importRosterFileName.textContent = file.name;
+    importRoster(file);
+  }
+
+  function clearRosterDropState() {
+    dom.importRosterDropZone.classList.remove('drag-active');
+  }
+
   dom.addTeam.addEventListener('click', addTeam);
   dom.newTeamName.addEventListener('keydown', event => { if (event.key === 'Enter') addTeam(); });
   dom.addPlayer.addEventListener('click', addPlayer);
   dom.newPlayerName.addEventListener('keydown', event => { if (event.key === 'Enter') addPlayer(); });
   dom.importRosterFile.addEventListener('change', () => {
-    const file = dom.importRosterFile.files[0];
-    if (file) importRoster(file);
+    handleRosterFile(dom.importRosterFile.files[0]);
+  });
+  dom.importRosterDropZone.addEventListener('dragenter', event => {
+    if (![...event.dataTransfer.types].includes('Files')) return;
+    event.preventDefault();
+    dom.importRosterDropZone.classList.add('drag-active');
+  });
+  dom.importRosterDropZone.addEventListener('dragover', event => {
+    if (![...event.dataTransfer.types].includes('Files')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    dom.importRosterDropZone.classList.add('drag-active');
+  });
+  dom.importRosterDropZone.addEventListener('dragleave', event => {
+    if (!dom.importRosterDropZone.contains(event.relatedTarget)) clearRosterDropState();
+  });
+  dom.importRosterDropZone.addEventListener('drop', event => {
+    event.preventDefault();
+    clearRosterDropState();
+    handleRosterFile(event.dataTransfer.files[0]);
   });
   dom.exportAllPng.addEventListener('click', () => exportTeamsPng(state.teams));
   dom.exportAllPdf.addEventListener('click', () => exportTeamsPdf(state.teams));

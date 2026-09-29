@@ -40,7 +40,7 @@ La versión web no recupera automáticamente los datos de la aplicación de Wind
 
 ## Importar una ficha de equipo
 
-En la sección **Nuevo jugador**, selecciona el PDF de inscripción. La app toma el nombre del equipo y los participantes con rol **Deportista**, crea el equipo si todavía no existe y añade los jugadores al banquillo. Los dorsales se asignan automáticamente y una segunda importación omite los nombres que ya estén en ese equipo. La ficha debe ser un PDF con texto seleccionable, como la hoja de inscripción de la competición.
+En la sección **Nuevo jugador**, arrastra el PDF de inscripción a la zona de importación o haz clic en ella para buscarlo. La app toma únicamente el nombre de la columna **Participante** (no el documento) y las filas con rol **Deportista**, crea el equipo si todavía no existe y añade los jugadores al banquillo. Los dorsales se asignan automáticamente y una segunda importación omite los nombres que ya estén en ese equipo. Puedes editar los nombres y dorsales desde la tabla de jugadores. La ficha debe ser un PDF con texto seleccionable, como la hoja de inscripción de la competición.
 
 ## Probar en local
 
