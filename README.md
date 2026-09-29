@@ -22,6 +22,8 @@ Versión web estática del organizador de fútbol 7. La carpeta `public/` es la 
 
 No necesitas dependencias, compilación real, backend ni base de datos. `_headers` configura las cabeceras de Cloudflare Pages y la revalidación de los archivos al actualizarlos.
 
+Si el repositorio está configurado como **Workers Builds** en vez de Pages, `wrangler.jsonc` define el nombre `ogs-lineup-manager`, la fecha de compatibilidad y los archivos estáticos de `public`. En ese caso puedes mantener `npx wrangler deploy --assets ./public` como comando de despliegue.
+
 ## Alternativa: subir el ZIP
 
 En un proyecto Pages de **Direct Upload**, sube `ladderly-web.zip` mediante la opción de arrastrar y soltar. También puedes subir directamente la carpeta `public`. El ZIP contiene los archivos en la raíz, sin el ejecutable de Windows. Después, configura el dominio como se indica arriba.
