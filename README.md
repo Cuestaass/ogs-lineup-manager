@@ -36,6 +36,10 @@ Los datos se guardan en `localStorage` del navegador; no se envían al servidor 
 
 La versión web no recupera automáticamente los datos de la aplicación de Windows. HTTP, HTTPS, www y el dominio sin www tienen almacenamientos distintos: utiliza siempre la dirección HTTPS definitiva. PNG y PDF son copias visuales, no copias restaurables de los datos.
 
+## Importar una ficha de equipo
+
+En la sección **Nuevo jugador**, selecciona el PDF de inscripción. La app toma el nombre del equipo y los participantes con rol **Deportista**, crea el equipo si todavía no existe y añade los jugadores al banquillo. Los dorsales se asignan automáticamente y una segunda importación omite los nombres que ya estén en ese equipo. La ficha debe ser un PDF con texto seleccionable, como la hoja de inscripción de la competición.
+
 ## Probar en local
 
 Con Python instalado, desde la raíz del repositorio:
