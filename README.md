@@ -4,7 +4,7 @@ Aplicación web de fútbol 7. La carpeta `public/` contiene las pantallas que si
 
 ## Desplegar la integración JDM en Cloudflare Workers
 
-La aplicación se organiza en rutas `/organizador/` y `/jdm/`, con una barra lateral común en `public/shell.js`. El organizador usa módulos nativos para el estado y la importación PDF; conserva la clave `localStorage` existente. No requiere React ni dependencias de ejecución. `node scripts/build-static.mjs` genera `public/app.bundle.js` a partir de los módulos del organizador.
+La aplicación se organiza en rutas `/organizador/`, `/tactica/` y `/jdm/`, con una navegación común en `public/shell.js`. El organizador usa módulos nativos para el estado y la importación PDF; conserva la clave `localStorage` existente. La pizarra táctica permite colocar jugadores, balones y conos, dibujar recorridos, deshacer cambios y exportar la jugada como PNG. No requiere React ni dependencias de ejecución. `node scripts/build-static.mjs` genera `public/app.bundle.js` a partir de los módulos del organizador.
 
 La aplicación incorpora un Worker con D1 y una sincronización programada cada tres horas. El portal municipal publica los datos semanalmente; la programación oficial se fija el jueves a las 20:00 antes de la jornada. El Worker consulta la API CKAN del Ayuntamiento, guarda clasificaciones y partidos de FC OGS, FC OGS II e Inter Maccabi y registra cambios de fecha, hora, campo y estado. La primera lectura crea la referencia inicial y no genera avisos retroactivos.
 
@@ -23,7 +23,7 @@ Fuente: [Portal de datos abiertos del Ayuntamiento de Madrid](https://datos.madr
 
 ## Alternativa estática
 
-Puedes seguir sirviendo `public/` sin Worker, pero la ruta `/jdm/` no recibirá datos. La gestión local de alineaciones sigue funcionando. El ZIP estático incluye ambas rutas, pero para consultar JDM debes desplegar el Worker.
+Puedes seguir sirviendo `public/` sin Worker, pero la ruta `/jdm/` no recibirá datos. La gestión local de alineaciones y la pizarra táctica siguen funcionando. El ZIP estático incluye las pantallas públicas, pero para consultar JDM debes desplegar el Worker.
 
 ## Datos guardados
 
@@ -51,7 +51,7 @@ Con Python instalado, desde la raíz del repositorio:
 python -m http.server 8080 --bind 127.0.0.1 --directory public
 ```
 
-Abre `http://127.0.0.1:8080/organizador/` y visita también `/jdm/`. Crea un equipo y un jugador, pulsa «Alinear 7», recarga y comprueba que se conserva. Prueba las exportaciones PNG y PDF y la vista en móvil. Detén el servidor con Ctrl+C.
+Abre `http://127.0.0.1:8080/organizador/` y visita también `/tactica/` y `/jdm/`. Crea un equipo y un jugador, pulsa «Alinear 7», recarga y comprueba que se conserva. En la pizarra táctica, añade fichas, dibuja una flecha, mueve un jugador y exporta la jugada. Prueba las exportaciones y la vista en móvil. Detén el servidor con Ctrl+C.
 
 ## Generar el ZIP tras hacer cambios
 

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Dibuja jugadas y movimientos sobre una pizarra táctica de fútbol 7.">
+  <meta name="theme-color" content="#172f29">
+  <title>Pizarra táctica · FC OGS</title>
+  <link rel="icon" type="image/png" href="../assets/fc-ogs-crest.png">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="preload" href="../assets/fonts/Barlow-Regular.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="../assets/fonts/Newsreader.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body data-page="tactica">
+  <header class="app-header tactics-header">
+    <div>
+      <p class="eyebrow">LABORATORIO DE JUEGO</p>
+      <h1>La sala táctica</h1>
+      <p>Mueve fichas, traza recorridos y convierte una idea en una jugada que se pueda explicar.</p>
+    </div>
+    <div class="header-actions">
+      <button id="tactics-export" class="primary">Guardar jugada · PNG</button>
+    </div>
+  </header>
+
+  <main id="main-content" class="tactics-main">
+    <section class="tactics-workbench" aria-labelledby="tactics-title">
+      <div class="tactics-rail">
+        <div class="tactics-intro">
+          <p class="eyebrow">01 / HERRAMIENTAS</p>
+          <h2 id="tactics-title">Mesa de trabajo</h2>
+          <p>Elige una herramienta y toca el campo. Con «Mover» puedes recolocar cualquier elemento.</p>
+        </div>
+
+        <div class="tool-group" role="group" aria-label="Fichas">
+          <span class="tool-label">Fichas</span>
+          <button class="tactic-tool is-active" type="button" data-tool="select" aria-pressed="true"><span class="tool-glyph cursor-glyph">↖</span>Mover</button>
+          <button class="tactic-tool" type="button" data-tool="home" aria-pressed="false"><span class="kit-dot home-dot">7</span>FC OGS</button>
+          <button class="tactic-tool" type="button" data-tool="away" aria-pressed="false"><span class="kit-dot away-dot">9</span>Rival</button>
+          <button class="tactic-tool" type="button" data-tool="ball" aria-pressed="false"><span class="ball-glyph">●</span>Balón</button>
+          <button class="tactic-tool" type="button" data-tool="cone" aria-pressed="false"><span class="cone-glyph">▲</span>Cono</button>
+        </div>
+
+        <div class="tool-group" role="group" aria-label="Dibujo">
+          <span class="tool-label">Trazos</span>
+          <button class="tactic-tool" type="button" data-tool="arrow" aria-pressed="false"><span class="tool-glyph">↗</span>Flecha</button>
+          <button class="tactic-tool" type="button" data-tool="line" aria-pressed="false"><span class="tool-glyph">╱</span>Línea</button>
+          <button class="tactic-tool" type="button" data-tool="freehand" aria-pressed="false"><span class="tool-glyph">〰</span>Libre</button>
+          <button class="tactic-tool" type="button" data-tool="eraser" aria-pressed="false"><span class="tool-glyph">×</span>Borrar</button>
+        </div>
+
+        <fieldset class="tactic-colors">
+          <legend>Color del trazo</legend>
+          <label><input type="radio" name="tactic-color" value="#e4ed79" checked><span class="color-swatch marker-swatch">Amarillo</span></label>
+          <label><input type="radio" name="tactic-color" value="#f3efe1"><span class="color-swatch white-swatch">Blanco</span></label>
+          <label><input type="radio" name="tactic-color" value="#e45538"><span class="color-swatch red-swatch">Rojo</span></label>
+          <label><input type="radio" name="tactic-color" value="#66c7ff"><span class="color-swatch blue-swatch">Azul</span></label>
+        </fieldset>
+
+        <div class="history-actions">
+          <button id="tactics-undo" type="button" class="secondary" disabled>Deshacer</button>
+          <button id="tactics-redo" type="button" class="secondary" disabled>Rehacer</button>
+          <button id="tactics-clear" type="button" class="danger ghost">Vaciar pizarra</button>
+        </div>
+      </div>
+
+      <div class="tactics-stage-wrap">
+        <div class="tactics-scoreline" aria-live="polite">
+          <span><strong id="home-count">0</strong> FC OGS</span>
+          <span class="scoreline-centre">PIZARRA 01</span>
+          <span>RIVAL <strong id="away-count">0</strong></span>
+        </div>
+        <div class="tactics-stage">
+          <svg id="tactics-board" viewBox="0 0 1050 680" role="application" aria-label="Campo táctico interactivo. Usa las herramientas o mueve las fichas con el puntero.">
+            <defs>
+              <pattern id="tactic-grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="#e4ed79" stroke-opacity=".07" stroke-width="1"/></pattern>
+              <filter id="piece-shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#071713" flood-opacity=".45"/></filter>
+              <marker id="arrow-yellow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0 0L10 5L0 10z" fill="#e4ed79"/></marker>
+              <marker id="arrow-white" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0 0L10 5L0 10z" fill="#f3efe1"/></marker>
+              <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0 0L10 5L0 10z" fill="#e45538"/></marker>
+              <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0 0L10 5L0 10z" fill="#66c7ff"/></marker>
+            </defs>
+            <g class="tactic-field" aria-hidden="true">
+              <rect width="1050" height="680" fill="#1d4035"/>
+              <rect width="1050" height="680" fill="url(#tactic-grid)"/>
+              <rect x="18" y="18" width="1014" height="644" fill="none" stroke="#b8c9b0" stroke-width="3"/>
+              <line x1="525" y1="18" x2="525" y2="662" stroke="#b8c9b0" stroke-width="3"/>
+              <circle cx="525" cy="340" r="92" fill="none" stroke="#b8c9b0" stroke-width="3"/>
+              <circle cx="525" cy="340" r="5" fill="#b8c9b0"/>
+              <rect x="18" y="176" width="170" height="328" fill="none" stroke="#b8c9b0" stroke-width="3"/>
+              <rect x="862" y="176" width="170" height="328" fill="none" stroke="#b8c9b0" stroke-width="3"/>
+              <rect x="18" y="251" width="68" height="178" fill="none" stroke="#b8c9b0" stroke-width="3"/>
+              <rect x="964" y="251" width="68" height="178" fill="none" stroke="#b8c9b0" stroke-width="3"/>
+              <path d="M188 274a78 78 0 010 132M862 274a78 78 0 000 132" fill="none" stroke="#b8c9b0" stroke-width="3"/>
+              <circle cx="129" cy="340" r="4" fill="#b8c9b0"/><circle cx="921" cy="340" r="4" fill="#b8c9b0"/>
+            </g>
+            <g id="tactics-drawing-layer"></g>
+            <g id="tactics-piece-layer"></g>
+            <g id="tactics-preview-layer" pointer-events="none"></g>
+          </svg>
+        </div>
+        <div class="tactics-caption">
+          <p><span class="caption-key">Consejo</span> Doble clic sobre un jugador para ponerle nombre. <kbd>Supr</kbd> elimina la selección.</p>
+          <p id="tactics-status" role="status" aria-live="polite">Pizarra preparada.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="../shell.js"></script>
+  <script src="../tactica.js"></script>
+</body>
+</html>

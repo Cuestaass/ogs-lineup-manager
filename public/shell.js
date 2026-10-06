@@ -1,6 +1,7 @@
 const page = document.body.dataset.page;
 const items = [
   { key: 'organizador', href: '../organizador/index.html', label: 'La pizarra', icon: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 3v18M3 12h18M8 8l2 2m4 4 2 2"/>' },
+  { key: 'tactica', href: '../tactica/index.html', label: 'Pizarra táctica', icon: '<path d="M4 4h16v16H4zM12 4v16"/><circle cx="12" cy="12" r="3"/><path d="M7 8l2 2m6 4 2 2"/>' },
   { key: 'jdm', href: '../jdm/index.html', label: 'Partidos y clasificación', icon: '<path d="M4 19V5m0 0h16v14H4zM8 15l3-3 2 2 3-4"/>' }
 ];
 const icon = markup => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${markup}</svg>`;
