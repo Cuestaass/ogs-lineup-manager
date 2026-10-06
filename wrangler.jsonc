@@ -5,6 +5,6 @@
   "assets": { "directory": "./public", "binding": "ASSETS" },
   "triggers": { "crons": ["0 */3 * * *"] },
   "d1_databases": [
-    { "binding": "JDM_DB", "database_name": "ogs-jdm", "database_id": "REPLACE_WITH_D1_DATABASE_ID", "migrations_dir": "migrations" }
+    { "binding": "JDM_DB", "database_name": "ogs-jdm", "database_id": "b4ac379a-7552-449c-a43d-6699a5e2b9a8", "migrations_dir": "migrations" }
   ]
 }
