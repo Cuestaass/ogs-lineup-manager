@@ -1,0 +1,17 @@
+{
+  "name": "FC OGS · Cuaderno de campo",
+  "short_name": "FC OGS",
+  "start_url": "/organizador/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eae5d5",
+  "theme_color": "#172f29",
+  "icons": [
+    {
+      "src": "/assets/fc-ogs-crest.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

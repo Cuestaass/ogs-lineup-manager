@@ -1,7 +1,10 @@
 {
   "name": "ogs-lineup-manager",
+  "main": "worker.js",
   "compatibility_date": "2026-09-29",
-  "assets": {
-    "directory": "./public"
-  }
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+  "triggers": { "crons": ["0 */3 * * *"] },
+  "d1_databases": [
+    { "binding": "JDM_DB", "database_name": "ogs-jdm", "database_id": "REPLACE_WITH_D1_DATABASE_ID", "migrations_dir": "migrations" }
+  ]
 }

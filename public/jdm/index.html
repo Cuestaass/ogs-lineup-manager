@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Consulta partidos y clasificaciones JDM de FC OGS.">
+  <meta name="theme-color" content="#172f29">
+  <title>JDM · FC OGS</title>
+  <link rel="icon" type="image/png" href="../assets/fc-ogs-crest.png">
+  <link rel="apple-touch-icon" href="../assets/fc-ogs-crest.png">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="preload" href="../assets/fonts/Barlow-Regular.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="../assets/fonts/Newsreader.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body data-page="jdm">
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">COMPETICIÓN MUNICIPAL</p>
+      <h1>Partidos y clasificaciones</h1>
+      <p>La jornada, de un vistazo. Sigue a tus equipos y consulta cada cambio de programación.</p>
+    </div>
+    <div class="header-actions"><a class="header-link" href="../organizador/index.html">Preparar alineación <span aria-hidden="true">↗</span></a></div>
+  </header>
+  <main class="jdm-main" id="main-content">
+    <section class="panel jdm-panel">
+      <div class="section-heading"><div><p class="eyebrow">01 / SEGUIMIENTO</p><h2>Cuaderno de competición</h2><p>FC OGS, FC OGS II e Inter Maccabi</p></div><span class="source-pill">Fuente oficial · Madrid</span></div>
+      <p id="jdm-status" role="status" aria-live="polite"></p>
+      <button id="jdm-retry" class="secondary" type="button" hidden>Reintentar consulta</button>
+      <p id="jdm-alerts" role="status" aria-live="polite"></p>
+      <div id="jdm-teams" class="jdm-grid"></div>
+      <p class="jdm-attribution">Datos: <a href="https://datos.madrid.es/dataset/211549-0-juegos-deportivos-actual" target="_blank" rel="noopener noreferrer">Ayuntamiento de Madrid</a> · CC BY 4.0. Los avisos del navegador funcionan mientras la página está abierta.</p>
+    </section>
+  </main>
+  <script src="../shell.js"></script>
+  <script src="../jdm.js"></script>
+</body>
+</html>

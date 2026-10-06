@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Organiza equipos de fútbol 7, prepara alineaciones y exporta los resultados en PNG o PDF.">
+  <meta name="theme-color" content="#172f29">
+  <title>La pizarra · FC OGS</title>
+  <link rel="icon" type="image/png" href="../assets/fc-ogs-crest.png">
+  <link rel="apple-touch-icon" href="../assets/fc-ogs-crest.png">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="preload" href="../assets/fonts/Barlow-Regular.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="../assets/fonts/Newsreader.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body data-page="organizador">
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">ÁREA DE EQUIPOS</p>
+      <h1>La pizarra</h1>
+      <p>Prepara el siete. Organiza los cambios. Lleva tu equipo al campo.</p>
+    </div>
+    <div class="header-actions">
+      <button id="export-all-png" class="secondary">Exportar todos · PNG</button>
+      <button id="export-all-pdf" class="secondary">Exportar todos · PDF</button>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <nav class="section-nav" aria-label="Secciones del organizador"><a href="#alineaciones"><span>01</span> Alineaciones</a><a href="#altas"><span>02</span> Altas e importación</a><a href="#plantilla"><span>03</span> Plantilla</a></nav>
+    <noscript><p class="panel">Activa JavaScript en tu navegador para utilizar el organizador.</p></noscript>
+
+    <section class="summary-grid" id="summary-grid" aria-label="Resumen de equipos"></section>
+    <section id="alineaciones" aria-labelledby="alineaciones-title">
+      <div class="section-heading teams-heading">
+        <div>
+          <p class="eyebrow">01 / DÍA DE PARTIDO</p><h2 id="alineaciones-title">Alineaciones</h2>
+          <p>Selecciona un jugador y después su posición, o arrástralo al campo.</p>
+        </div>
+      </div>
+      <p id="lineup-empty" class="lineup-empty" hidden>Tu pizarra está lista. <a href="#altas">Añade jugadores o importa una ficha PDF</a> para preparar el primer siete.</p>
+      <div id="teams-container" class="teams-grid"></div>
+    </section>
+    <section class="panel team-creator" id="altas" aria-labelledby="altas-title">
+      <div>
+        <p class="eyebrow">02 / ALTAS E IMPORTACIÓN</p><h2 id="altas-title">Amplía tu equipo</h2>
+        <p>Crea un equipo o incorpora jugadores a los que ya tienes.</p>
+      </div>
+      <div class="inline-form">
+        <label>
+          <span>Nombre del nuevo equipo</span>
+          <input id="new-team-name" type="text" placeholder="Ej. FC OGS C" maxlength="40">
+        </label>
+        <button id="add-team" class="primary">Añadir equipo</button>
+      </div>
+    </section>
+
+    <section class="panel player-creator">
+      <div>
+        <h2>Nuevo jugador</h2>
+        <p>El dorsal se asigna automáticamente cuando se deja vacío.</p>
+      </div>
+      <div class="player-form-grid">
+        <label>
+          <span>Nombre</span>
+          <input id="new-player-name" type="text" placeholder="Nombre del jugador" maxlength="40">
+        </label>
+        <label>
+          <span>Dorsal opcional</span>
+          <input id="new-player-number" type="number" min="1" max="999" placeholder="Automático">
+        </label>
+        <fieldset id="new-player-teams" class="team-checkboxes">
+          <legend>Asignar a equipos</legend>
+        </fieldset>
+        <button id="add-player" class="primary">Añadir jugador</button>
+      </div>
+      <div class="import-roster">
+        <div>
+          <strong>Importar ficha de equipo</strong>
+          <p>Sube el PDF de inscripción para crear el equipo y añadir sus deportistas al banquillo.</p>
+        </div>
+        <label class="file-drop-zone" id="import-roster-drop-zone">
+          <input id="import-roster-file" class="file-drop-input" type="file" accept="application/pdf,.pdf" aria-describedby="import-roster-hint">
+          <span class="file-drop-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M12 3v11m0 0 4-4m-4 4-4-4M4 16v4h16v-4" />
+            </svg>
+            <span class="file-format-badge">PDF</span>
+          </span>
+          <span class="file-drop-copy">
+            <strong id="import-roster-file-name">Arrastra la ficha PDF aquí</strong>
+            <span id="import-roster-hint">o haz clic para buscarla en tu dispositivo</span>
+          </span>
+        </label>
+      </div>
+      <p id="feedback" class="feedback" aria-live="polite"></p>
+    </section>
+
+
+    <section class="panel roster-section" id="plantilla" aria-labelledby="plantilla-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">03 / PLANTILLA</p><h2 id="plantilla-title">Todos los jugadores</h2>
+          <p>Edita el nombre o el dorsal, asigna un jugador a varios equipos o elimínalo.</p>
+        </div>
+        <button id="clear-all" class="danger ghost">Borrar todos los datos</button>
+      </div>
+      <div class="table-wrap">
+        <table class="players-table">
+          <thead>
+            <tr>
+              <th>Dorsal</th>
+              <th>Jugador</th>
+              <th>Equipos</th>
+              <th><span class="sr-only">Acciones</span></th>
+            </tr>
+          </thead>
+          <tbody id="players-body"></tbody>
+        </table>
+      </div>
+      <div id="players-empty" class="empty-state">Todavía no hay jugadores. <a href="#altas">Añade el primero o importa la ficha del equipo.</a></div>
+    </section>
+
+    <p class="storage-notice"><strong>Guardado en este navegador.</strong> Los datos no se sincronizan y se pierden si borras los datos del sitio. PNG y PDF conservan una copia visual de la alineación.</p>
+  </main>
+
+  <template id="team-template">
+    <article class="team-card">
+      <div class="team-card-header">
+        <div class="team-title-block">
+          <input class="team-name-input" aria-label="Nombre del equipo" maxlength="40">
+          <p class="team-meta"></p>
+          <div class="lineup-meter"><span class="lineup-total"></span><span class="lineup-caption">Titulares en campo</span></div>
+        </div>
+        <div class="team-controls">
+          <label>
+            <span>Formación</span>
+            <select class="formation-select">
+              <option value="321">3-2-1</option>
+              <option value="231">2-3-1</option>
+              <option value="222">2-2-2</option>
+              <option value="132">1-3-2</option>
+              <option value="312">3-1-2</option>
+            </select>
+          </label>
+          <button class="auto-lineup primary">Alinear 7</button>
+          <button class="bench-all secondary">Todos al banquillo</button>
+        </div>
+      </div>
+
+      <div class="export-actions">
+        <button class="export-png secondary">Exportar PNG</button>
+        <button class="export-pdf secondary">Exportar PDF</button>
+        <button class="delete-team danger ghost">Eliminar equipo</button>
+      </div>
+
+      <div class="pitch-export-area">
+        <div class="pitch" aria-label="Campo de fútbol 7">
+          <div class="line halfway"></div>
+          <div class="centre-circle"></div>
+          <div class="penalty-area top"></div>
+          <div class="penalty-area bottom"></div>
+          <div class="goal top"></div>
+          <div class="goal bottom"></div>
+          <div class="pitch-slot" data-slot="0"></div>
+          <div class="pitch-slot" data-slot="1"></div>
+          <div class="pitch-slot" data-slot="2"></div>
+          <div class="pitch-slot" data-slot="3"></div>
+          <div class="pitch-slot" data-slot="4"></div>
+          <div class="pitch-slot" data-slot="5"></div>
+          <div class="pitch-slot" data-slot="6"></div>
+        </div>
+        <div class="bench-section">
+          <div class="bench-heading">
+            <strong>Banquillo</strong>
+            <span class="bench-count"></span>
+          </div>
+          <div class="bench"></div>
+        </div>
+      </div>
+
+      <div class="team-notes">
+      <section class="natural-subs-section">
+        <div class="natural-subs-heading">
+          <div>
+            <h3>Cambios naturales</h3>
+            <p>Vincula un suplente con el titular al que sustituye.</p>
+          </div>
+          <span class="natural-subs-count"></span>
+        </div>
+        <div class="natural-subs-list"></div>
+      </section>
+
+      <div class="team-list-section">
+        <h3>Lista del equipo</h3>
+        <ol class="team-roster-list"></ol>
+      </div>
+      </div>
+    </article>
+  </template>
+
+  <script src="../shell.js"></script>
+  <script src="../app.bundle.js"></script>
+</body>
+</html>
