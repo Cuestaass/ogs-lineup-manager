@@ -4,7 +4,7 @@ Aplicación web de fútbol 7. La carpeta `public/` contiene las pantallas que si
 
 ## Desplegar la integración JDM en Cloudflare Workers
 
-La aplicación se organiza en rutas `/organizador/`, `/tactica/` y `/jdm/`, con una navegación común en `public/shell.js`. El organizador usa módulos nativos para el estado y la importación PDF; conserva la clave `localStorage` existente. La pizarra táctica permite colocar jugadores, balones y conos, dibujar recorridos, deshacer cambios y exportar la jugada como PNG. No requiere React ni dependencias de ejecución. `node scripts/build-static.mjs` genera `public/app.bundle.js` a partir de los módulos del organizador.
+La aplicación se organiza en rutas `/organizador/`, `/tactica/` y `/jdm/`, con una navegación común en `public/shell.js`. El organizador usa módulos nativos para el estado y la importación PDF; conserva la clave `localStorage` existente. La pizarra táctica permite colocar jugadores, balones y conos, dibujar recorridos, deshacer cambios y exportar la jugada como PNG; en pantallas estrechas, el campo gira automáticamente a orientación vertical. No requiere React ni dependencias de ejecución. `node scripts/build-static.mjs` genera `public/app.bundle.js` a partir de los módulos del organizador.
 
 La aplicación incorpora un Worker con D1 y una sincronización programada cada tres horas. El portal municipal publica los datos semanalmente; la programación oficial se fija el jueves a las 20:00 antes de la jornada. El Worker consulta la API CKAN del Ayuntamiento, guarda clasificaciones y partidos de FC OGS, FC OGS II e Inter Maccabi y registra cambios de fecha, hora, campo y estado. La primera lectura crea la referencia inicial y no genera avisos retroactivos.
 

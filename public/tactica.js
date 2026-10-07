@@ -4,11 +4,13 @@
   const drawingLayer = document.getElementById('tactics-drawing-layer');
   const pieceLayer = document.getElementById('tactics-piece-layer');
   const previewLayer = document.getElementById('tactics-preview-layer');
+  const fieldLayer = board.querySelector('.tactic-field');
   const status = document.getElementById('tactics-status');
   const undoButton = document.getElementById('tactics-undo');
   const redoButton = document.getElementById('tactics-redo');
   const ns = 'http://www.w3.org/2000/svg';
   const arrowIds = { '#e4ed79': 'arrow-yellow', '#f3efe1': 'arrow-white', '#e45538': 'arrow-red', '#66c7ff': 'arrow-blue' };
+  const portraitQuery = matchMedia('(max-width: 700px)');
 
   let state = load();
   let tool = 'select';
@@ -61,9 +63,13 @@
     Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
     return node;
   }
+  function displayPoint(x, y) {
+    return portraitQuery.matches ? { x: 680 - y, y: x } : { x, y };
+  }
   function point(event) {
     const client = new DOMPoint(event.clientX, event.clientY);
-    return client.matrixTransform(board.getScreenCTM().inverse());
+    const visible = client.matrixTransform(board.getScreenCTM().inverse());
+    return portraitQuery.matches ? { x: visible.y, y: 680 - visible.x } : visible;
   }
   function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
   function currentColor() { return document.querySelector('[name="tactic-color"]:checked').value; }
@@ -107,10 +113,15 @@
   function renderPath(item) {
     let node;
     if (item.type === 'line' || item.type === 'arrow') {
-      node = svg('line', { x1: item.x1, y1: item.y1, x2: item.x2, y2: item.y2 });
+      const start = displayPoint(item.x1, item.y1);
+      const end = displayPoint(item.x2, item.y2);
+      node = svg('line', { x1: start.x, y1: start.y, x2: end.x, y2: end.y });
       if (item.type === 'arrow') node.setAttribute('marker-end', `url(#${arrowIds[item.color] || 'arrow-yellow'})`);
     } else {
-      node = svg('polyline', { points: item.points.map(value => value.join(',')).join(' '), fill: 'none' });
+      node = svg('polyline', { points: item.points.map(value => {
+        const visible = displayPoint(value[0], value[1]);
+        return `${visible.x},${visible.y}`;
+      }).join(' '), fill: 'none' });
     }
     node.setAttribute('stroke', item.color);
     node.setAttribute('stroke-width', '6');
@@ -121,7 +132,8 @@
     drawingLayer.appendChild(node);
   }
   function renderPiece(item) {
-    const group = svg('g', { transform: `translate(${item.x} ${item.y})`, tabindex: '0', role: 'button' });
+    const visible = displayPoint(item.x, item.y);
+    const group = svg('g', { transform: `translate(${visible.x} ${visible.y})`, tabindex: '0', role: 'button' });
     group.dataset.id = item.id;
     group.classList.add('tactic-object', `tactic-${item.type}`);
     group.classList.toggle('is-selected', item.id === selectedId);
@@ -195,9 +207,14 @@
         if (Math.hypot(p.x - last[0], p.y - last[1]) > 4) gesture.points.push([p.x, p.y]);
       }
       previewLayer.replaceChildren();
+      const start = displayPoint(gesture.start.x, gesture.start.y);
+      const end = displayPoint(p.x, p.y);
       const preview = gesture.mode === 'freehand'
-        ? svg('polyline', { points: gesture.points.map(value => value.join(',')).join(' '), fill: 'none' })
-        : svg('line', { x1: gesture.start.x, y1: gesture.start.y, x2: p.x, y2: p.y });
+        ? svg('polyline', { points: gesture.points.map(value => {
+          const visible = displayPoint(value[0], value[1]);
+          return `${visible.x},${visible.y}`;
+        }).join(' '), fill: 'none' })
+        : svg('line', { x1: start.x, y1: start.y, x2: end.x, y2: end.y });
       preview.setAttribute('stroke', currentColor());
       preview.setAttribute('stroke-width', '6');
       preview.setAttribute('stroke-linecap', 'round');
@@ -252,15 +269,18 @@
     const clone = board.cloneNode(true);
     clone.querySelector('#tactics-preview-layer')?.remove();
     clone.querySelectorAll('.is-selected').forEach(node => node.classList.remove('is-selected'));
-    clone.setAttribute('width', '2100');
-    clone.setAttribute('height', '1360');
+    const viewBox = board.viewBox.baseVal;
+    const exportWidth = viewBox.width * 2;
+    const exportHeight = viewBox.height * 2;
+    clone.setAttribute('width', exportWidth);
+    clone.setAttribute('height', exportHeight);
     const source = new XMLSerializer().serializeToString(clone);
     const url = URL.createObjectURL(new Blob([source], { type: 'image/svg+xml;charset=utf-8' }));
     try {
       const image = new Image();
       await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = url; });
       const canvas = document.createElement('canvas');
-      canvas.width = 2100; canvas.height = 1360;
+      canvas.width = exportWidth; canvas.height = exportHeight;
       canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
       const link = document.createElement('a');
@@ -279,5 +299,20 @@
     if (['Delete', 'Backspace'].includes(event.key) && selectedId && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) removeElement(selectedId);
   });
 
+  function setOrientation() {
+    const portrait = portraitQuery.matches;
+    board.setAttribute('viewBox', portrait ? '0 0 680 1050' : '0 0 1050 680');
+    board.style.aspectRatio = portrait ? '680 / 1050' : '1050 / 680';
+    fieldLayer.setAttribute('transform', portrait ? 'translate(680 0) rotate(90)' : '');
+    board.setAttribute('aria-label', portrait
+      ? 'Campo táctico vertical interactivo. Usa las herramientas o mueve las fichas con el puntero.'
+      : 'Campo táctico horizontal interactivo. Usa las herramientas o mueve las fichas con el puntero.');
+    gesture = null;
+    previewLayer.replaceChildren();
+    render();
+  }
+  portraitQuery.addEventListener('change', setOrientation);
+
   setTool('select');
+  setOrientation();
 })();
