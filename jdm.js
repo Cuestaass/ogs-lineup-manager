@@ -42,6 +42,24 @@ function rank(row) {
     goalsFor: number(row.Goles_favor), goalsAgainst: number(row.Goles_contra)
   };
 }
+function candidateKey(candidate) {
+  return [candidate.Codigo_temporada, candidate.Codigo_competicion, candidate.Codigo_fase, candidate.Codigo_grupo, candidate.Codigo_equipo].join(':');
+}
+function candidatesFromMatch(row, teamName) {
+  const common = {
+    Codigo_temporada: row.Codigo_temporada,
+    Codigo_competicion: row.Codigo_competicion,
+    Codigo_fase: row.Codigo_fase,
+    Codigo_grupo: row.Codigo_grupo,
+    Nombre_grupo: row.Nombre_grupo,
+    Nombre_deporte: row.Nombre_deporte,
+    Nombre_distrito: row.Distrito
+  };
+  return [
+    { ...common, Codigo_equipo: row.Codigo_equipo1, Nombre_equipo: row.Equipo_local },
+    { ...common, Codigo_equipo: row.Codigo_equipo2, Nombre_equipo: row.Equipo_visitante }
+  ].filter(candidate => norm(candidate.Nombre_equipo) === norm(teamName));
+}
 export function changes(previous, current) {
   const old = new Map((previous?.fixtures || []).map(item => [item.id, item]));
   if (!previous) return [];
@@ -53,16 +71,24 @@ export function changes(previous, current) {
   });
 }
 export async function fetchTeam(pilot, season = seasonStart()) {
-  const candidates = await search('standings', { q: pilot.name });
-  const exact = candidates.filter(row => norm(row.Nombre_equipo) === norm(pilot.name) && number(row.Codigo_temporada) === season && (!pilot.teamCode || String(row.Codigo_equipo) === String(pilot.teamCode)) && (!pilot.groupCode || String(row.Codigo_grupo) === String(pilot.groupCode)));
+  // At the start of a season Madrid can publish the calendar before every group
+  // appears in the standings file. Discover the team from both resources so a
+  // missing classification does not hide fixtures that are already official.
+  const [standingCandidates, matchRows] = await Promise.all([
+    search('standings', { q: pilot.name }),
+    search('matches', { q: pilot.name })
+  ]);
+  const candidates = [
+    ...standingCandidates.filter(row => norm(row.Nombre_equipo) === norm(pilot.name)),
+    ...matchRows.flatMap(row => candidatesFromMatch(row, pilot.name))
+  ];
+  const unique = [...new Map(candidates.map(candidate => [candidateKey(candidate), candidate])).values()];
+  const exact = unique.filter(row => number(row.Codigo_temporada) === season && (!pilot.teamCode || String(row.Codigo_equipo) === String(pilot.teamCode)) && (!pilot.groupCode || String(row.Codigo_grupo) === String(pilot.groupCode)));
   if (exact.length === 0) return { slug: pilot.slug, name: pilot.name, season, state: 'unavailable', fixtures: [], standings: [] };
   if (exact.length > 1) return { slug: pilot.slug, name: pilot.name, season, state: 'ambiguous', choices: exact.map(row => ({ teamCode: String(row.Codigo_equipo), group: row.Nombre_grupo, district: row.Nombre_distrito, sport: row.Nombre_deporte })), fixtures: [], standings: [] };
   const row = exact[0];
   const group = { Codigo_temporada: row.Codigo_temporada, Codigo_competicion: row.Codigo_competicion, Codigo_fase: row.Codigo_fase, Codigo_grupo: row.Codigo_grupo };
-  const [standingRows, matchRows] = await Promise.all([
-    search('standings', { filters: group }),
-    search('matches', { q: pilot.name })
-  ]);
+  const standingRows = await search('standings', { filters: group });
   const code = String(row.Codigo_equipo);
   const fixtures = matchRows.filter(match =>
     number(match.Codigo_temporada) === season &&
