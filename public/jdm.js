@@ -16,7 +16,7 @@
   }
   const followed = new Set();
   const seen = JSON.parse(localStorage.getItem('jdm-seen-v1') || '{}');
-  const request = (url, options = {}) => fetch(url, {
+  const request = (url, options = {}) => fetch(`${globalThis.__OGS_API_URL__ || ''}${url}`, {
     ...options,
     headers: { ...options.headers, accept: 'application/json', authorization: `Bearer ${globalThis.__OGS_ACCESS_TOKEN__ || ''}` }
   });
