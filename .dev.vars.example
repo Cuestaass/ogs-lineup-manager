@@ -1,0 +1,6 @@
+SUPABASE_URL=https://TU_PROJECT_REF.supabase.co
+SUPABASE_JWT_AUDIENCE=authenticated
+FRONTEND_URL=http://localhost:5173
+ALLOWED_ORIGINS=http://localhost:5173
+JDM_REFRESH_TOKEN=genera-un-secreto-largo
+PILOT_BOOTSTRAP_TOKEN=genera-otro-secreto-largo

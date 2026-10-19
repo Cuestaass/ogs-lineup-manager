@@ -1,5 +1,6 @@
 (() => {
-  const STORAGE_KEY = 'fc-ogs-tactics-v1';
+  const STORAGE_KEY = `ogs-tactics-v2:${globalThis.__OGS_TEAM__?.id || 'local'}`;
+  const LEGACY_STORAGE_KEY = 'fc-ogs-tactics-v1';
   const board = document.getElementById('tactics-board');
   const drawingLayer = document.getElementById('tactics-drawing-layer');
   const pieceLayer = document.getElementById('tactics-piece-layer');
@@ -22,7 +23,7 @@
   function emptyState() { return { nextId: 1, homeNumber: 1, awayNumber: 1, elements: [] }; }
   function load() {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY));
       return saved && Array.isArray(saved.elements) ? saved : emptyState();
     } catch { return emptyState(); }
   }
@@ -94,7 +95,7 @@
     const number = type === 'home' ? state.homeNumber++ : state.awayNumber++;
     state.elements.push({ id: nextId(), type, x: clamp(x, 35, 1015), y: clamp(y, 35, 645), number, label: '' });
     commit(before);
-    announce(`${type === 'home' ? 'Jugador FC OGS' : 'Jugador rival'} ${number} añadido.`);
+    announce(`${type === 'home' ? `Jugador ${globalThis.__OGS_TEAM__?.name || 'local'}` : 'Jugador rival'} ${number} añadido.`);
   }
   function addMarker(type, x, y) {
     const before = snapshot();
@@ -138,7 +139,7 @@
     group.classList.add('tactic-object', `tactic-${item.type}`);
     group.classList.toggle('is-selected', item.id === selectedId);
     if (item.type === 'home' || item.type === 'away') {
-      group.setAttribute('aria-label', `${item.type === 'home' ? 'FC OGS' : 'Rival'}, dorsal ${item.number}${item.label ? `, ${item.label}` : ''}`);
+      group.setAttribute('aria-label', `${item.type === 'home' ? globalThis.__OGS_TEAM__?.name || 'Equipo' : 'Rival'}, dorsal ${item.number}${item.label ? `, ${item.label}` : ''}`);
       group.append(svg('circle', { r: '27', fill: item.type === 'home' ? '#e4ed79' : '#e45538', stroke: '#f3efe1', 'stroke-width': '3' }));
       const number = svg('text', { y: '8', 'text-anchor': 'middle', fill: '#172f29', 'font-family': 'Barlow Condensed', 'font-size': '25', 'font-weight': '700' });
       number.textContent = item.number;

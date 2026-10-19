@@ -1,4 +1,6 @@
-const STORAGE_KEY = 'fc-ogs-organizer-v1';
+const LEGACY_STORAGE_KEY = 'fc-ogs-organizer-v1';
+const activeTeamId = () => globalThis.__OGS_TEAM__?.id || 'local';
+const storageKey = () => `ogs-organizer-v2:${activeTeamId()}`;
 
 export const formations = {
     '321': [
@@ -51,14 +53,23 @@ export const formations = {
 export const defaultState = () => ({
     nextTeamId: 2,
     nextPlayerId: 1,
-    teams: [{ id: 1, name: 'FC OGS A', formation: '321', lineup: Array(7).fill(null), naturalSubs: [] }],
+    teams: [{ id: 1, name: globalThis.__OGS_TEAM__?.name || 'Mi equipo', formation: '321', lineup: Array(7).fill(null), naturalSubs: [] }],
     players: []
   });
 
 export function loadState() {
     try {
-      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      let serialized = localStorage.getItem(storageKey());
+      const migratingTeam = !serialized && activeTeamId().startsWith('local-') ? Number(activeTeamId().slice(6)) : null;
+      if (!serialized && activeTeamId().startsWith('local')) serialized = localStorage.getItem(LEGACY_STORAGE_KEY);
+      const parsed = JSON.parse(serialized);
       if (!parsed || !Array.isArray(parsed.teams) || !parsed.teams.length || !Array.isArray(parsed.players)) return defaultState();
+      if (migratingTeam) {
+        const team = parsed.teams.find(item => item.id === migratingTeam);
+        if (!team) return defaultState();
+        parsed.teams = [team];
+        parsed.players = parsed.players.filter(player => player.teamIds?.includes(migratingTeam)).map(player => ({ ...player, teamIds: [migratingTeam] }));
+      }
       parsed.teams.forEach(team => {
         if (!Array.isArray(team.lineup)) team.lineup = Array(7).fill(null);
         team.lineup = [...team.lineup.slice(0, 7), ...Array(7).fill(null)].slice(0, 7);
@@ -75,6 +86,7 @@ export function loadState() {
   }
 
 export function saveState(state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(storageKey(), JSON.stringify(state));
+  if (activeTeamId() === 'local') localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(state));
 }
 

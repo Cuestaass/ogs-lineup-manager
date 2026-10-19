@@ -1,10 +1,5 @@
 const BASE = 'https://datos.madrid.es/api/3/action/datastore_search';
 const RESOURCES = { matches: '211549-0-juegos-deportivos-actual-csv', standings: '211549-2-juegos-deportivos-actual-csv' };
-export const PILOTS = [
-  { slug: 'fc-ogs', name: 'FC OGS' },
-  { slug: 'fc-ogs-ii', name: 'FC OGS II' },
-  { slug: 'inter-maccabi', name: 'Inter Maccabi' }
-];
 const norm = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, ' ').trim().toUpperCase();
 const number = value => value === '' || value == null ? null : Number(value);
 export const seasonStart = (date = new Date()) => date.getUTCMonth() >= 7 ? date.getUTCFullYear() : date.getUTCFullYear() - 1;
@@ -45,7 +40,7 @@ function rank(row) {
 function candidateKey(candidate) {
   return [candidate.Codigo_temporada, candidate.Codigo_competicion, candidate.Codigo_fase, candidate.Codigo_grupo, candidate.Codigo_equipo].join(':');
 }
-function candidatesFromMatch(row, teamName) {
+function candidatesFromMatch(row, teamName = null) {
   const common = {
     Codigo_temporada: row.Codigo_temporada,
     Codigo_competicion: row.Codigo_competicion,
@@ -58,7 +53,26 @@ function candidatesFromMatch(row, teamName) {
   return [
     { ...common, Codigo_equipo: row.Codigo_equipo1, Nombre_equipo: row.Equipo_local },
     { ...common, Codigo_equipo: row.Codigo_equipo2, Nombre_equipo: row.Equipo_visitante }
-  ].filter(candidate => norm(candidate.Nombre_equipo) === norm(teamName));
+  ].filter(candidate => !teamName || norm(candidate.Nombre_equipo) === norm(teamName));
+}
+export async function searchTeams(criteria, season = seasonStart()) {
+  const filters = typeof criteria === 'string' ? { query: criteria } : (criteria || {});
+  const value = String(filters.query || '').trim();
+  const league = norm(filters.league || '');
+  const district = norm(filters.district || '');
+  if (value.length < 2 && !league && !district) return [];
+  const params = value.length >= 2 ? { q: value } : {};
+  const [standings, matches] = await Promise.all([search('standings', params), search('matches', params)]);
+  const candidates = [...standings, ...matches.flatMap(row => candidatesFromMatch(row))]
+    .filter(row => number(row.Codigo_temporada) === season)
+    .filter(row => value.length < 2 || norm(row.Nombre_equipo).includes(norm(value)))
+    .filter(row => !league || norm(row.Nombre_grupo).includes(league))
+    .filter(row => !district || norm(row.Nombre_distrito).includes(district));
+  return [...new Map(candidates.map(row => [candidateKey(row), row])).values()].slice(0, 30).map(row => ({
+    slug: [row.Codigo_temporada, row.Codigo_competicion, row.Codigo_fase, row.Codigo_grupo, row.Codigo_equipo].join('-').toLowerCase(),
+    name: row.Nombre_equipo, teamCode: String(row.Codigo_equipo), groupCode: String(row.Codigo_grupo),
+    group: row.Nombre_grupo || '', district: row.Nombre_distrito || '', sport: row.Nombre_deporte || ''
+  }));
 }
 export function changes(previous, current) {
   const old = new Map((previous?.fixtures || []).map(item => [item.id, item]));

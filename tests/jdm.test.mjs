@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { fetchTeam, changes, seasonStart } from '../jdm.js';
+import { fetchTeam, changes, searchTeams, seasonStart } from '../jdm.js';
 
 test('identifica un equipo por temporada y código y muestra grupo y partidos', async () => {
   const original = globalThis.fetch;
@@ -58,4 +58,33 @@ test('muestra el calendario aunque el grupo aún no figure en clasificaciones', 
 test('la temporada cambia en agosto', () => {
   assert.equal(seasonStart(new Date('2026-07-31T12:00:00Z')), 2025);
   assert.equal(seasonStart(new Date('2026-08-01T12:00:00Z')), 2026);
+});
+
+test('busca equipos oficiales dinámicamente sin una lista piloto', async () => {
+  const original = globalThis.fetch;
+  const standing = { Codigo_temporada: '2026', Codigo_competicion: 'JDM', Codigo_fase: '1', Codigo_grupo: '8', Codigo_equipo: '77', Nombre_equipo: 'Barrio Norte', Nombre_grupo: 'GRUPO 8', Nombre_deporte: 'FUTBOL 7', Nombre_distrito: 'CENTRO' };
+  globalThis.fetch = async url => {
+    const resource = new URL(url).searchParams.get('resource_id');
+    return { ok: true, json: async () => ({ success: true, result: { records: resource.includes('211549-2') ? [standing] : [] } }) };
+  };
+  try {
+    const results = await searchTeams('barrio', 2026);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].name, 'Barrio Norte');
+    assert.equal(results[0].teamCode, '77');
+    assert.match(results[0].slug, /2026-jdm-1-8-77/);
+  } finally { globalThis.fetch = original; }
+});
+
+test('permite buscar equipos por liga o distrito', async () => {
+  const original = globalThis.fetch;
+  const rows = [
+    { Codigo_temporada: '2026', Codigo_competicion: 'JDM', Codigo_fase: '1', Codigo_grupo: '8', Codigo_equipo: '77', Nombre_equipo: 'Barrio Norte', Nombre_grupo: 'LIGA CENTRO', Nombre_deporte: 'FUTBOL 7', Nombre_distrito: 'CENTRO' },
+    { Codigo_temporada: '2026', Codigo_competicion: 'JDM', Codigo_fase: '1', Codigo_grupo: '9', Codigo_equipo: '78', Nombre_equipo: 'Barrio Sur', Nombre_grupo: 'LIGA SUR', Nombre_deporte: 'FUTBOL 7', Nombre_distrito: 'USERA' }
+  ];
+  globalThis.fetch = async url => ({ ok: true, json: async () => ({ success: true, result: { records: new URL(url).searchParams.get('resource_id').includes('211549-2') ? rows : [] } }) });
+  try {
+    assert.deepEqual((await searchTeams({ district: 'centro' }, 2026)).map(team => team.name), ['Barrio Norte']);
+    assert.deepEqual((await searchTeams({ league: 'liga sur' }, 2026)).map(team => team.name), ['Barrio Sur']);
+  } finally { globalThis.fetch = original; }
 });

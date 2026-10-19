@@ -1,0 +1,29 @@
+{
+  "name": "ogs-lineup-manager",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:api": "wrangler dev",
+    "build": "vite build && node scripts/copy-static-assets.mjs",
+    "deploy:pages": "npm run build && wrangler pages deploy public-build --project-name ogs-lineup-manager",
+    "deploy:api": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply ogs-jdm --local",
+    "db:migrate:remote": "wrangler d1 migrations apply ogs-jdm --remote",
+    "bootstrap:pilots": "node scripts/bootstrap-pilots.mjs",
+    "test": "node --test",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "jose": "^6.2.12",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.1.2",
+    "vite": "8.3.4",
+    "wrangler": "^4.151.2"
+  }
+}
