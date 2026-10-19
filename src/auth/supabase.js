@@ -6,6 +6,8 @@ const supabaseKey = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '');
 const apiUrl = String(import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const localHost = typeof location !== 'undefined' && ['localhost', '127.0.0.1'].includes(location.hostname);
 
+if (typeof window !== 'undefined') window.__OGS_API_URL__ = apiUrl;
+
 export const localDevelopment = localHost && !supabaseUrl && !supabaseKey;
 
 if (!localDevelopment && (!supabaseUrl || !supabaseKey || !apiUrl)) {
