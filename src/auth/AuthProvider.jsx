@@ -1,19 +1,29 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { api, clearSession, getSession } from './oidc.js';
+import { api, clearSession, getSession, onAuthStateChange } from './supabase.js';
 
 const AuthContext = createContext(null);
 const ACTIVE_TEAM_KEY = 'ogs-active-team-v1';
 
 export function AuthProvider({ children }) {
-  const [session] = useState(getSession);
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   window.__OGS_ACCESS_TOKEN__ = session?.accessToken || '';
 
   useEffect(() => {
+    let active = true;
+    getSession().then(value => { if (active) setSession(value); }).catch(reason => setError(reason.message)).finally(() => { if (active) setAuthLoading(false); });
+    const unsubscribe = onAuthStateChange(value => { if (active) setSession(value); });
+    return () => { active = false; unsubscribe(); };
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
     if (!session) {
-      location.replace('/login/');
+      const returnTo = `${location.pathname}${location.search}`;
+      location.replace(`/login/?returnTo=${encodeURIComponent(returnTo)}`);
       return;
     }
     if (session.accessToken === 'local-development') {
@@ -33,7 +43,7 @@ export function AuthProvider({ children }) {
       const team = value.teams.find(item => item.id === stored) || value.teams[0];
       if (team) localStorage.setItem(ACTIVE_TEAM_KEY, team.id);
     }).catch(reason => setError(reason.message)).finally(() => setLoading(false));
-  }, [session]);
+  }, [session, authLoading]);
 
   const value = useMemo(() => ({
     session,
@@ -43,13 +53,13 @@ export function AuthProvider({ children }) {
       localStorage.setItem(ACTIVE_TEAM_KEY, teamId);
       location.reload();
     },
-    logout() {
-      clearSession();
+    async logout() {
+      await clearSession();
       location.replace('/login/');
     }
   }), [session, account]);
 
-  if (loading) return <main className="session-state"><p>Abriendo tu espacio de equipo…</p></main>;
+  if (authLoading || loading) return <main className="session-state"><p>Abriendo tu espacio de equipo…</p></main>;
   if (error) return <main className="session-state"><h1>No se pudo abrir la aplicación</h1><p>{error}</p><a className="header-link" href="/login/">Volver a acceder</a></main>;
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

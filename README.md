@@ -6,33 +6,42 @@ Las decisiones sobre proveedores, responsabilidades y despliegues independientes
 
 ## Arquitectura v2
 
-- React + Vite monta las rutas `/organizador/`, `/tactica/`, `/jdm/`, `/equipo/`, `/unirse/` y `/login/`.
-- Supabase Auth es el proveedor de identidad decidido. Su integración sustituirá el adaptador OIDC temporal antes del despliegue de producción.
-- El Worker valida cada JWT con las claves JWKS del emisor y aprovisiona en el primer acceso un usuario, un workspace personal y un equipo.
-- D1 guarda membresías, roles, suscripciones, invitaciones, convocatorias y equipos JDM seguidos.
-- Las alineaciones y la pizarra táctica conservan por ahora la persistencia del navegador, pero con una clave independiente por `team_id`. Los datos v1 se migran al abrir por primera vez cada equipo local.
+- **Frontend:** React + Vite en Cloudflare Pages, con las rutas `/organizador/`, `/tactica/`, `/jdm/`, `/equipo/`, `/unirse/` y `/login/`.
+- **Identidad:** Supabase Auth con correo y contraseña, confirmación, recuperación de contraseña y renovación automática de sesión.
+- **API:** Cloudflare Worker independiente. Valida cada JWT de Supabase mediante JWKS y aprovisiona en el primer acceso un usuario, un workspace personal y un equipo.
+- **Datos:** Cloudflare D1 guarda membresías, roles, suscripciones, invitaciones, convocatorias y equipos JDM seguidos.
+- **Tareas:** el Worker sincroniza JDM cada tres horas mediante Cron Triggers.
+- Las alineaciones y la pizarra táctica conservan por ahora la persistencia del navegador, aislada por `team_id`.
+
+La guía completa de configuración está en [`docs/despliegue-cloudflare-supabase.md`](docs/despliegue-cloudflare-supabase.md).
 
 ### Desarrollo
 
-```powershell
-npm.cmd install
-npm.cmd run dev
+```sh
+npm install
+cp .env.example .env.local
+cp .dev.vars.example .dev.vars
+npm run db:migrate:local
+npm run dev:api
+# En otra terminal:
+npm run dev
 ```
 
-En `http://localhost:5173/login/`, la pantalla de acceso ofrece tres cuentas mánager simuladas para FC OGS, FC OGS II e INTER MACCABI. Desde `/equipo/` se prueban miembros, enlaces, plantilla y convocatorias; los enlaces creados abren el flujo público `/unirse/`. Esta excepción no se activa en un dominio desplegado.
+Si no se configuran las dos variables `VITE_SUPABASE_*`, `http://localhost:5173/login/` mantiene las tres cuentas mánager simuladas. Para probar Supabase y la API reales en local, rellena `.env.local` y `.dev.vars`.
 
 ### Compilación y despliegue
 
-```powershell
-npm.cmd test
-npm.cmd run build
-npx wrangler d1 migrations apply ogs-jdm --remote
-npx wrangler deploy
+```sh
+npm test
+npm run build
+npm run db:migrate:remote
+npm run deploy:api
+npm run deploy:pages
 ```
 
-La integración final con Supabase Auth y sus variables está pendiente y documentada en `docs/decisiones-arquitectura.md`; el adaptador OIDC actual no debe considerarse la configuración final. `public-build/` es un artefacto generado y es la carpeta publicada por Wrangler.
+`public-build/` es un artefacto generado y es la carpeta que publica Pages. `worker.js` se despliega por separado y no sirve el frontend.
 
-Aplicación web de fútbol 7. La carpeta `public/` contiene las pantallas que sirve el Worker. Conserva equipos, jugadores, formaciones, alineaciones y exportación PNG/PDF de la aplicación original.
+Aplicación web de fútbol 7. La carpeta `public/` contiene los recursos estáticos que Vite incorpora al despliegue de Pages. Conserva equipos, jugadores, formaciones, alineaciones y exportación PNG/PDF de la aplicación original.
 
 ## Desplegar la integración JDM en Cloudflare Workers
 
@@ -41,7 +50,7 @@ La aplicación se organiza en rutas `/organizador/`, `/tactica/` y `/jdm/`, con 
 La aplicación incorpora un Worker con D1 y una sincronización programada cada tres horas. El portal municipal publica los datos semanalmente; la programación oficial se fija el jueves a las 20:00 antes de la jornada. El Worker consulta la API CKAN del Ayuntamiento, guarda clasificaciones y partidos de FC OGS, FC OGS II e Inter Maccabi y registra cambios de fecha, hora, campo y estado. La primera lectura crea la referencia inicial y no genera avisos retroactivos.
 
 1. Crea una base D1: `npx wrangler d1 create ogs-jdm`.
-2. Copia su `database_id` en `wrangler.jsonc`, sustituyendo `REPLACE_WITH_D1_DATABASE_ID`.
+2. Copia su `database_id` en `wrangler.jsonc` si la base configurada no pertenece a tu cuenta.
 3. Aplica el esquema: `npx wrangler d1 migrations apply ogs-jdm --remote`.
 4. Configura un secreto para sincronizar manualmente: `npx wrangler secret put JDM_REFRESH_TOKEN`.
 5. Despliega con `npx wrangler deploy` y configura el dominio del Worker en Cloudflare.

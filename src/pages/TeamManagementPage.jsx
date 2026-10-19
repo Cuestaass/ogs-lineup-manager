@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { api } from '../auth/oidc.js';
+import { api } from '../auth/supabase.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { AppShell } from '../components/AppShell.jsx';
 

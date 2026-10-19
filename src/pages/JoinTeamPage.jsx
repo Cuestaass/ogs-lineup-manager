@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, getSession } from '../auth/oidc.js';
+import { api, getSession } from '../auth/supabase.js';
 
 const readJson = async response => {
   const body = await response.json();
@@ -11,12 +11,13 @@ const roleName = role => role === 'delegate' ? 'delegado' : 'jugador';
 
 export default function JoinTeamPage() {
   const token = new URLSearchParams(location.search).get('token') || '';
-  const session = getSession();
+  const [session, setSession] = useState(null);
   const [invitation, setInvitation] = useState(null);
   const [status, setStatus] = useState(token ? 'Comprobando invitación…' : 'Falta el token de invitación.');
   const [joined, setJoined] = useState(false);
 
   useEffect(() => {
+    getSession().then(setSession).catch(error => setStatus(error.message));
     if (!token) return;
     api(`/api/invites/${encodeURIComponent(token)}`).then(readJson).then(value => {
       setInvitation(value);

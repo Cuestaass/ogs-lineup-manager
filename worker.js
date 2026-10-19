@@ -1,52 +1,73 @@
 import { fetchTeam, changes, searchTeams } from './jdm.js';
 import { ROLE_PERMISSIONS, hasPermission, subscriptionAllows, validateInvite } from './access.js';
 import { PILOT_TEAMS } from './pilots.js';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
-const decode = value => Uint8Array.from(atob(value.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(value.length / 4) * 4, '=')), char => char.charCodeAt(0));
 const encode = bytes => btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 const hashToken = async token => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)))].map(value => value.toString(16).padStart(2, '0')).join('');
 const managementPermissions = new Set(['billing.manage', 'team.manage', 'members.manage', 'members.invite', 'roster.manage', 'callups.manage', 'tactics.manage', 'lineups.manage', 'goals.record']);
-let jwksCache;
+const claimName = claims => claims.user_metadata?.full_name || claims.user_metadata?.name || claims.name || claims.preferred_username || claims.email || 'Usuario';
+
+function allowedOrigin(request, env) {
+  const origin = request.headers.get('origin');
+  if (!origin) return '';
+  const configured = [env.FRONTEND_URL, ...(env.ALLOWED_ORIGINS || '').split(',')].map(value => String(value || '').trim().replace(/\/$/, '')).filter(Boolean);
+  if (configured.includes(origin)) return origin;
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
+  return '';
+}
+
+function withCors(response, request, env) {
+  const origin = allowedOrigin(request, env);
+  if (!origin) return response;
+  const headers = new Headers(response.headers);
+  headers.set('access-control-allow-origin', origin);
+  headers.set('access-control-allow-headers', 'authorization, content-type');
+  headers.set('access-control-allow-methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  headers.set('vary', 'Origin');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+let supabaseJwks;
+let supabaseIssuer;
 
 async function authenticate(request, env) {
   const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
-  if (!token || !env.OIDC_ISSUER || !env.OIDC_CLIENT_ID) throw new Response('', { status: 401 });
-  const [head, body, signature] = token.split('.');
-  if (!signature) throw new Response('', { status: 401 });
-  const header = JSON.parse(new TextDecoder().decode(decode(head)));
-  const claims = JSON.parse(new TextDecoder().decode(decode(body)));
-  const issuer = env.OIDC_ISSUER.replace(/\/$/, '');
-  if (!jwksCache || jwksCache.expires < Date.now()) {
-    const response = await fetch(`${issuer}/protocol/openid-connect/certs`);
-    if (!response.ok) throw new Response('', { status: 503 });
-    jwksCache = { keys: (await response.json()).keys, expires: Date.now() + 3600000 };
+  if (!token || !env.SUPABASE_URL) throw new Response('', { status: 401 });
+  const issuer = `${env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1`;
+  if (!supabaseJwks || supabaseIssuer !== issuer) {
+    supabaseIssuer = issuer;
+    supabaseJwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`), { cacheMaxAge: 10 * 60 * 1000 });
   }
-  const jwk = jwksCache.keys.find(key => key.kid === header.kid && key.kty === 'RSA');
-  if (!jwk || header.alg !== 'RS256') throw new Response('', { status: 401 });
-  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-  const valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, decode(signature), new TextEncoder().encode(`${head}.${body}`));
-  const audience = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (!valid || claims.iss !== issuer || claims.exp * 1000 <= Date.now() || (!audience.includes(env.OIDC_CLIENT_ID) && claims.azp !== env.OIDC_CLIENT_ID)) throw new Response('', { status: 401 });
-  return claims;
+  try {
+    const { payload } = await jwtVerify(token, supabaseJwks, {
+      issuer,
+      audience: env.SUPABASE_JWT_AUDIENCE || 'authenticated',
+      algorithms: ['RS256', 'ES256']
+    });
+    return payload;
+  } catch {
+    throw new Response('', { status: 401 });
+  }
 }
 
 async function ensureAccount(env, claims) {
   const userId = String(claims.sub);
-  await env.JDM_DB.prepare('INSERT INTO users(id,email,display_name) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET email=excluded.email,display_name=excluded.display_name').bind(userId, claims.email || null, claims.name || claims.preferred_username || 'Usuario').run();
+  const displayName = claimName(claims);
+  await env.JDM_DB.prepare('INSERT INTO users(id,email,display_name) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET email=excluded.email,display_name=excluded.display_name').bind(userId, claims.email || null, displayName).run();
   let workspace = await env.JDM_DB.prepare('SELECT w.id,w.name FROM workspaces w JOIN workspace_members wm ON wm.workspace_id=w.id WHERE wm.user_id=? ORDER BY w.created_at LIMIT 1').bind(userId).first();
   if (!workspace) {
     const workspaceId = crypto.randomUUID();
     const teamId = crypto.randomUUID();
-    const displayName = claims.given_name || claims.name || 'Mi';
+    const ownerName = claims.user_metadata?.full_name || claims.given_name || claims.name || 'Mi';
     await env.JDM_DB.batch([
-      env.JDM_DB.prepare('INSERT INTO workspaces(id,name) VALUES(?,?)').bind(workspaceId, `Espacio de ${displayName}`),
+      env.JDM_DB.prepare('INSERT INTO workspaces(id,name) VALUES(?,?)').bind(workspaceId, `Espacio de ${ownerName}`),
       env.JDM_DB.prepare("INSERT INTO workspace_members(workspace_id,user_id,role) VALUES(?,?,'owner')").bind(workspaceId, userId),
       env.JDM_DB.prepare('INSERT INTO teams(id,workspace_id,name) VALUES(?,?,?)').bind(teamId, workspaceId, 'Mi equipo'),
       env.JDM_DB.prepare("INSERT INTO team_members(team_id,user_id,role) VALUES(?,?,'manager')").bind(teamId, userId),
       env.JDM_DB.prepare("INSERT INTO team_subscriptions(team_id,plan,status,billing_owner_user_id) VALUES(?,'free','inactive',?)").bind(teamId, userId)
     ]);
-    workspace = { id: workspaceId, name: `Espacio de ${displayName}` };
+    workspace = { id: workspaceId, name: `Espacio de ${ownerName}` };
   }
   return { userId, workspace };
 }
@@ -142,7 +163,7 @@ async function authenticatedApi(request, env, ctx, url) {
   const account = await ensureAccount(env, claims);
   if (url.pathname === '/api/me' && request.method === 'GET') {
     const teams = await env.JDM_DB.prepare('SELECT t.id,t.name,t.sport,tm.role FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE tm.user_id=? AND tm.status=? ORDER BY t.created_at').bind(account.userId, 'active').all();
-    return json({ user: { id: account.userId, name: claims.name || claims.preferred_username, email: claims.email || null }, workspace: account.workspace, teams: teams.results });
+    return json({ user: { id: account.userId, name: claimName(claims), email: claims.email || null }, workspace: account.workspace, teams: teams.results });
   }
   const inviteAccept = url.pathname.match(/^\/api\/invites\/([^/]+)\/accept$/);
   if (inviteAccept && request.method === 'POST') {
@@ -155,7 +176,7 @@ async function authenticatedApi(request, env, ctx, url) {
     const consumed = await env.JDM_DB.prepare('UPDATE team_invites SET use_count=use_count+1 WHERE id=? AND revoked_at IS NULL AND expires_at>? AND use_count<max_uses').bind(invitation.id, new Date().toISOString()).run();
     if (consumed.meta?.changes !== 1) return json({ error: 'La invitación ya no está disponible.' }, 410);
     await env.JDM_DB.prepare('INSERT INTO team_members(team_id,user_id,role,status) VALUES(?,?,?,?)').bind(invitation.team_id, account.userId, invitation.role, 'active').run();
-    if (invitation.role === 'player') await env.JDM_DB.prepare('INSERT INTO roster_players(id,team_id,user_id,display_name) VALUES(?,?,?,?) ON CONFLICT(team_id,user_id) DO UPDATE SET status=?').bind(crypto.randomUUID(), invitation.team_id, account.userId, claims.name || claims.preferred_username || 'Jugador', 'active').run();
+    if (invitation.role === 'player') await env.JDM_DB.prepare('INSERT INTO roster_players(id,team_id,user_id,display_name) VALUES(?,?,?,?) ON CONFLICT(team_id,user_id) DO UPDATE SET status=?').bind(crypto.randomUUID(), invitation.team_id, account.userId, claimName(claims), 'active').run();
     return json({ joined: true, teamId: invitation.team_id, role: invitation.role });
   }
   const accessMatch = url.pathname.match(/^\/api\/teams\/([^/]+)\/access$/);
@@ -186,7 +207,8 @@ async function authenticatedApi(request, env, ctx, url) {
       const id = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + invite.expiresInDays * 86400000).toISOString();
       await env.JDM_DB.prepare('INSERT INTO team_invites(id,team_id,token_hash,role,mode,intended_email,max_uses,expires_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)').bind(id, teamId, await hashToken(token), invite.role, invite.mode, invite.email, invite.maxUses, expiresAt, account.userId).run();
-      return json({ id, token, url: `${url.origin}/unirse/?token=${encodeURIComponent(token)}`, expiresAt, emailDelivery: invite.email ? 'pending-external-provider' : 'not-requested' }, 201);
+      const frontendUrl = String(env.FRONTEND_URL || url.origin).replace(/\/$/, '');
+      return json({ id, token, url: `${frontendUrl}/unirse/?token=${encodeURIComponent(token)}`, expiresAt, emailDelivery: invite.email ? 'pending-external-provider' : 'not-requested' }, 201);
     }
     if (resource === 'roster' && request.method === 'GET') {
       await requirePermission(env, account.userId, teamId, 'roster.manage');
@@ -299,20 +321,25 @@ export default {
   async scheduled(_event, env, ctx) { ctx.waitUntil(refresh(env)); },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.pathname === '/api/config' && request.method === 'GET') return json({ issuer: env.OIDC_ISSUER || '', clientId: env.OIDC_CLIENT_ID || '' });
-    if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
-    try {
-      if (url.pathname === '/api/admin/pilots' && request.method === 'POST') return await provisionPilots(request, env);
-      if (url.pathname === '/api/jdm/refresh' && request.method === 'POST' && env.JDM_REFRESH_TOKEN && request.headers.get('authorization') === `Bearer ${env.JDM_REFRESH_TOKEN}`) return json(await refresh(env));
-      const invitation = url.pathname.match(/^\/api\/invites\/([^/]+)$/);
-      if (invitation && request.method === 'GET') {
-        const summary = await inspectInvite(env, decodeURIComponent(invitation[1]));
-        return summary ? json(summary, summary.valid ? 200 : 410) : json({ error: 'Invitación no encontrada.' }, 404);
-      }
-      return await authenticatedApi(request, env, ctx, url);
-    } catch (error) {
-      if (error instanceof Response) return error.status === 401 ? json({ error: 'No autorizado' }, 401) : error;
-      return json({ error: 'Error interno', detail: String(error) }, 500);
+    if (!url.pathname.startsWith('/api/')) return json({ error: 'No encontrado' }, 404);
+    if (request.method === 'OPTIONS') {
+      const status = allowedOrigin(request, env) ? 204 : 403;
+      return withCors(new Response(null, { status }), request, env);
     }
+    let response;
+    try {
+      if (url.pathname === '/api/admin/pilots' && request.method === 'POST') response = await provisionPilots(request, env);
+      else if (url.pathname === '/api/jdm/refresh' && request.method === 'POST' && env.JDM_REFRESH_TOKEN && request.headers.get('authorization') === `Bearer ${env.JDM_REFRESH_TOKEN}`) response = json(await refresh(env));
+      else {
+        const invitation = url.pathname.match(/^\/api\/invites\/([^/]+)$/);
+        if (invitation && request.method === 'GET') {
+          const summary = await inspectInvite(env, decodeURIComponent(invitation[1]));
+          response = summary ? json(summary, summary.valid ? 200 : 410) : json({ error: 'Invitación no encontrada.' }, 404);
+        } else response = await authenticatedApi(request, env, ctx, url);
+      }
+    } catch (error) {
+      response = error instanceof Response ? (error.status === 401 ? json({ error: 'No autorizado' }, 401) : error) : json({ error: 'Error interno' }, 500);
+    }
+    return withCors(response, request, env);
   }
 };

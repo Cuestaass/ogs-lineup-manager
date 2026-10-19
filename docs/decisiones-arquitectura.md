@@ -8,10 +8,10 @@ Este documento registra decisiones que afectan a la arquitectura, servicios exte
 
 | Componente | Tecnología o proveedor | Despliegue | Estado |
 | --- | --- | --- | --- |
-| Frontend | React + Vite | Cloudflare Assets | En desarrollo |
-| API y tareas programadas | Cloudflare Worker | Cloudflare | En desarrollo |
+| Frontend | React + Vite | Cloudflare Pages | Configurado |
+| API y tareas programadas | Cloudflare Worker | Cloudflare | Configurado |
 | Datos de producto | Cloudflare D1 | Cloudflare | Existente; migración v2 pendiente |
-| Autenticación | Supabase Auth | Proyecto Supabase independiente | Decidido; integración pendiente |
+| Autenticación | Supabase Auth | Proyecto Supabase independiente | Integrada; configuración externa pendiente |
 | Fuente de competiciones | API de datos abiertos de Madrid | Servicio externo | Integrada |
 | Facturación | Proveedor por decidir | Servicio externo independiente | Pendiente |
 | Correo transaccional | Proveedor por decidir | Servicio externo independiente | Pendiente |
@@ -52,16 +52,9 @@ Consecuencias:
 - Será necesario definir una estrategia de exportación o migración de usuarios antes de abandonar el proveedor.
 - Las políticas y límites del plan gratuito deberán revisarse antes de abrir el producto a un volumen significativo.
 
-### Trabajo técnico pendiente
+### Estado técnico
 
-El código actual todavía implementa un flujo OIDC orientado a Keycloak. **No debe desplegarse como integración final de autenticación hasta completar estos cambios:**
-
-1. Sustituir el inicio de sesión OIDC específico de Keycloak por Supabase Auth.
-2. Gestionar sesión, renovación y cierre de sesión con el cliente de Supabase.
-3. Validar en el Worker la firma, emisor, audiencia y caducidad de los JWT de Supabase.
-4. Mantener el aprovisionamiento automático del primer `workspace` y equipo al recibir un usuario válido por primera vez.
-5. Probar registro, confirmación de correo, recuperación de contraseña, renovación de sesión y logout.
-6. Eliminar las variables y documentación específicas de Keycloak que queden obsoletas.
+La aplicación usa `@supabase/supabase-js` para registro, acceso, recuperación, renovación y cierre de sesión. El Worker valida firma, emisor, audiencia y caducidad contra el JWKS del proyecto mediante `jose`, y conserva el aprovisionamiento automático del primer `workspace` y equipo. Antes de producción sigue siendo necesaria una prueba de extremo a extremo contra el proyecto Supabase definitivo.
 
 ### Configuración externa pendiente en Supabase
 
@@ -77,9 +70,9 @@ El código actual todavía implementa un flujo OIDC orientado a Keycloak. **No d
 
 **Estado:** aceptada.
 
-La aplicación React, la API, las tareas programadas y D1 continuarán en Cloudflare:
+La aplicación React, la API, las tareas programadas y D1 continuarán en Cloudflare como dos despliegues:
 
-- React compilado en `public-build/` y servido como assets del Worker.
+- React compilado en `public-build/` y publicado en Cloudflare Pages.
 - `worker.js` como API privada y adaptador JDM.
 - D1 para usuarios internos, workspaces, equipos, membresías y seguimientos.
 - Cron de Cloudflare para sincronización periódica con JDM.
@@ -213,7 +206,8 @@ Antes de publicar una versión se debe revisar esta tabla:
 | --- | --- | --- |
 | Supabase Auth | Crear/configurar proyecto, URLs, proveedores y correo | Sí |
 | Cloudflare D1 | Aplicar migraciones remotas pendientes | Sí |
-| Cloudflare Worker/Assets | Compilar, probar y ejecutar el despliegue | Sí |
+| Cloudflare Pages | Compilar y publicar `public-build/` | Sí |
+| Cloudflare Worker | Desplegar API, variables y cron | Sí |
 | Proveedor de pagos | Clientes, checkout, portal, webhooks y secretos | Sí para lanzamiento comercial |
 | Correo transaccional | Invitaciones y correos operativos | Sí para invitaciones por email |
 | Dominio/DNS | Configurar dominio y HTTPS | Sí |

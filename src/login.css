@@ -6,3 +6,9 @@ body { margin: 0; background: radial-gradient(ellipse at 20% 0, #42644745, trans
 .login-card h1 { margin: 12px 0 18px; font-family: var(--display); font-weight: 500; font-size: clamp(2.5rem, 8vw, 4.3rem); line-height: .96; letter-spacing: -.045em; }
 .login-card > p:not(.eyebrow) { color: var(--muted); line-height: 1.55; }.login-action { width: 100%; margin-top: 24px; }.login-note { margin: 22px 0 0; font-size: .72rem; }.login-error { padding-left: 12px; border-left: 3px solid var(--danger); color: var(--danger) !important; }
 .pilot-login-actions { display: grid; gap: 8px; margin-top: 24px; }.pilot-login-actions .header-link { justify-content: flex-start; }
+.login-form { display: grid; gap: 16px; margin-top: 24px; }
+.login-form label { display: grid; gap: 7px; color: var(--muted); font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.login-form input { min-height: 46px; padding: 10px 12px; border: 1px solid var(--border); background: #fff; color: var(--ink); font: inherit; font-size: 1rem; text-transform: none; }
+.login-form input:focus { outline: 3px solid #d7a82f40; border-color: var(--marker); }
+.login-links { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 18px; }
+.login-links button { padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: .82rem; text-decoration: underline; cursor: pointer; }
