@@ -24,7 +24,14 @@
   </header>
   <main class="jdm-main" id="main-content">
     <section class="panel jdm-panel">
-      <div class="section-heading"><div><p class="eyebrow">01 / SEGUIMIENTO</p><h2>Cuaderno de competición</h2><p>FC OGS, FC OGS II e Inter Maccabi</p></div><span class="source-pill">Fuente oficial · Madrid</span></div>
+      <div class="section-heading"><div><p class="eyebrow">01 / SEGUIMIENTO</p><h2>Cuaderno de competición</h2><p>Sólo los equipos que tú sigues</p></div><span class="source-pill">Fuente oficial · Madrid</span></div>
+      <form id="jdm-search" class="jdm-search" role="search">
+        <label><span>Buscar un equipo en JDM Madrid</span><input id="jdm-search-query" type="search" minlength="2" placeholder="Nombre del equipo" autocomplete="off"></label>
+        <label><span>Liga o grupo</span><input id="jdm-search-league" type="search" placeholder="Ej. Liga Centro" autocomplete="off"></label>
+        <label><span>Distrito</span><input id="jdm-search-district" type="search" placeholder="Ej. Centro" autocomplete="off"></label>
+        <button class="primary" type="submit">Buscar equipo</button>
+      </form>
+      <div id="jdm-search-results" class="jdm-search-results" aria-live="polite"></div>
       <p id="jdm-status" role="status" aria-live="polite"></p>
       <button id="jdm-retry" class="secondary" type="button" hidden>Reintentar consulta</button>
       <p id="jdm-alerts" role="status" aria-live="polite"></p>

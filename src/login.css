@@ -1,0 +1,8 @@
+body { margin: 0; background: radial-gradient(ellipse at 20% 0, #42644745, transparent 65%), #172f29; }
+.login-page { min-height: 100vh; display: grid; place-items: center; padding: 28px; }
+.login-card { width: min(100%, 560px); padding: clamp(28px, 6vw, 58px); background: var(--paper); border-top: 6px solid var(--marker); box-shadow: 0 24px 70px #07171366; }
+.login-brand { display: flex; align-items: center; gap: 14px; padding-bottom: 34px; margin-bottom: 38px; border-bottom: 1px solid var(--border); }
+.login-brand img { width: 58px; height: 58px; }.login-brand span { display: grid; }.login-brand strong { font-family: var(--number); font-size: 1.25rem; }.login-brand small { color: var(--muted); font-size: .62rem; letter-spacing: .12em; }
+.login-card h1 { margin: 12px 0 18px; font-family: var(--display); font-weight: 500; font-size: clamp(2.5rem, 8vw, 4.3rem); line-height: .96; letter-spacing: -.045em; }
+.login-card > p:not(.eyebrow) { color: var(--muted); line-height: 1.55; }.login-action { width: 100%; margin-top: 24px; }.login-note { margin: 22px 0 0; font-size: .72rem; }.login-error { padding-left: 12px; border-left: 3px solid var(--danger); color: var(--danger) !important; }
+.pilot-login-actions { display: grid; gap: 8px; margin-top: 24px; }.pilot-login-actions .header-link { justify-content: flex-start; }

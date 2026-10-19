@@ -1,10 +1,42 @@
-# FC OGS para ladderly.es
+# Cuaderno de campo
+
+Frontend React para gestionar equipos de fútbol 7 de forma aislada por usuario y equipo. Conserva el aspecto y las funciones de las pantallas originales de organizador, pizarra táctica y JDM, añadiendo una capa común de identidad, organización y equipo activo.
+
+Las decisiones sobre proveedores, responsabilidades y despliegues independientes se registran en [`docs/decisiones-arquitectura.md`](docs/decisiones-arquitectura.md).
+
+## Arquitectura v2
+
+- React + Vite monta las rutas `/organizador/`, `/tactica/`, `/jdm/`, `/equipo/`, `/unirse/` y `/login/`.
+- Supabase Auth es el proveedor de identidad decidido. Su integración sustituirá el adaptador OIDC temporal antes del despliegue de producción.
+- El Worker valida cada JWT con las claves JWKS del emisor y aprovisiona en el primer acceso un usuario, un workspace personal y un equipo.
+- D1 guarda membresías, roles, suscripciones, invitaciones, convocatorias y equipos JDM seguidos.
+- Las alineaciones y la pizarra táctica conservan por ahora la persistencia del navegador, pero con una clave independiente por `team_id`. Los datos v1 se migran al abrir por primera vez cada equipo local.
+
+### Desarrollo
+
+```powershell
+npm.cmd install
+npm.cmd run dev
+```
+
+En `http://localhost:5173/login/`, la pantalla de acceso ofrece tres cuentas mánager simuladas para FC OGS, FC OGS II e INTER MACCABI. Desde `/equipo/` se prueban miembros, enlaces, plantilla y convocatorias; los enlaces creados abren el flujo público `/unirse/`. Esta excepción no se activa en un dominio desplegado.
+
+### Compilación y despliegue
+
+```powershell
+npm.cmd test
+npm.cmd run build
+npx wrangler d1 migrations apply ogs-jdm --remote
+npx wrangler deploy
+```
+
+La integración final con Supabase Auth y sus variables está pendiente y documentada en `docs/decisiones-arquitectura.md`; el adaptador OIDC actual no debe considerarse la configuración final. `public-build/` es un artefacto generado y es la carpeta publicada por Wrangler.
 
 Aplicación web de fútbol 7. La carpeta `public/` contiene las pantallas que sirve el Worker. Conserva equipos, jugadores, formaciones, alineaciones y exportación PNG/PDF de la aplicación original.
 
 ## Desplegar la integración JDM en Cloudflare Workers
 
-La aplicación se organiza en rutas `/organizador/`, `/tactica/` y `/jdm/`, con una navegación común en `public/shell.js`. El organizador usa módulos nativos para el estado y la importación PDF; conserva la clave `localStorage` existente. La pizarra táctica permite colocar jugadores, balones y conos, dibujar recorridos, deshacer cambios y exportar la jugada como PNG; en pantallas estrechas, el campo gira automáticamente a orientación vertical. No requiere React ni dependencias de ejecución. `node scripts/build-static.mjs` genera `public/app.bundle.js` a partir de los módulos del organizador.
+La aplicación se organiza en rutas `/organizador/`, `/tactica/` y `/jdm/`, con navegación y contexto de equipo compartidos en React. El organizador conserva sus módulos de dominio y la importación PDF. La pizarra táctica permite colocar jugadores, balones y conos, dibujar recorridos, deshacer cambios y exportar la jugada como PNG; en pantallas estrechas, el campo gira automáticamente a orientación vertical.
 
 La aplicación incorpora un Worker con D1 y una sincronización programada cada tres horas. El portal municipal publica los datos semanalmente; la programación oficial se fija el jueves a las 20:00 antes de la jornada. El Worker consulta la API CKAN del Ayuntamiento, guarda clasificaciones y partidos de FC OGS, FC OGS II e Inter Maccabi y registra cambios de fecha, hora, campo y estado. La primera lectura crea la referencia inicial y no genera avisos retroactivos.
 
@@ -17,7 +49,7 @@ La aplicación incorpora un Worker con D1 y una sincronización programada cada 
 
 Si el nombre de un equipo corresponde a varios grupos o fases, el estado será `ambiguous` y la respuesta incluirá los candidatos. Configura la variable `JDM_TEAM_CODES` como JSON para vincular códigos oficiales, por ejemplo `{"fc-ogs":{"teamCode":"123","groupCode":"4"}}`. Se pueden añadir más equipos en `PILOTS` de `jdm.js`; la base de datos y las rutas no requieren cambios. La temporada se calcula automáticamente y empieza en agosto. Durante julio a septiembre puede no haber datos disponibles de la temporada siguiente.
 
-**Avisos del piloto:** al seguir un equipo se guardan sus preferencias en el navegador y se consultan eventos cada cinco minutos mientras la página está abierta. Si se permite el permiso del navegador, aparece una notificación local. Esta versión no entrega notificaciones con la app cerrada ni identifica seguidores entre dispositivos. Para eso falta incorporar Web Push, suscripciones persistidas y una política de identidad/consentimiento. El Ayuntamiento no expone un mecanismo de publicación push en este conjunto de datos; la detección depende de la frecuencia de consulta y de publicación municipal.
+**Avisos:** los equipos seguidos se guardan por usuario en D1 y se consultan eventos cada cinco minutos mientras la página está abierta. Si se permite el permiso del navegador, aparece una notificación local. La entrega con la app cerrada sigue requiriendo Web Push. El Ayuntamiento no expone publicación push en este conjunto de datos; la detección depende de la frecuencia de consulta y de publicación municipal.
 
 Fuente: [Portal de datos abiertos del Ayuntamiento de Madrid](https://datos.madrid.es/dataset/211549-0-juegos-deportivos-actual), licencia CC BY 4.0.
 
@@ -27,7 +59,7 @@ Puedes seguir sirviendo `public/` sin Worker, pero la ruta `/jdm/` no recibirá 
 
 ## Datos guardados
 
-Los datos se guardan en `localStorage` del navegador; no se envían al servidor ni se sincronizan entre usuarios o dispositivos. No hay cuentas de usuario. Si borras los datos del sitio o usas navegación privada, puedes perder los equipos.
+Las plantillas, alineaciones y jugadas se guardan en `localStorage`, aisladas por equipo activo; todavía no se sincronizan entre dispositivos. La identidad, membresías y equipos JDM seguidos sí se guardan en el servidor.
 
 La versión web no recupera automáticamente los datos de la aplicación de Windows. HTTP, HTTPS, www y el dominio sin www tienen almacenamientos distintos: utiliza siempre la dirección HTTPS definitiva. PNG y PDF son copias visuales, no copias restaurables de los datos.
 

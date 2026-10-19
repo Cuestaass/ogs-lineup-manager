@@ -234,6 +234,10 @@ h3 { font-size: 1rem; }
 .jdm-card summary { min-height: 44px; cursor: pointer; font-size: .86rem; }
 .jdm-follow { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: .8rem; }
 .jdm-attribution { padding-top: 20px; border-top: 1px solid var(--border); font-size: .76rem !important; }
+.jdm-search { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(140px, 1fr) minmax(140px, 1fr) auto; align-items: end; gap: 10px; max-width: 980px; margin: 26px 0 12px; }
+.jdm-search-results { display: grid; gap: 1px; max-width: 900px; margin-bottom: 28px; background: var(--border); }
+.jdm-search-result { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 12px 14px; background: var(--panel); }
+.jdm-search-result strong, .jdm-search-result span { display: block; }.jdm-search-result span { color: var(--muted); font-size: .76rem; }
 #jdm-status:not(:empty), #jdm-alerts:not(:empty) { margin: 20px 0; padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--card); }
 @media (max-width: 1200px) {
   .app-header { flex-wrap: wrap; }
@@ -262,6 +266,7 @@ h3 { font-size: 1rem; }
   .summary-card { gap: 7px; }
   .summary-card strong { font-size: 1.5rem; }
   .section-heading { flex-wrap: wrap; align-items: flex-start; }
+  .jdm-search { grid-template-columns: 1fr; }.jdm-search-result { grid-template-columns: 1fr; }
   .team-controls { width: 100%; gap: 6px; }
   .team-controls button { padding-inline: 9px; font-size: .78rem; }
   .team-controls label { width: 82px; }

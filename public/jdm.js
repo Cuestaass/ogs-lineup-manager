@@ -3,14 +3,23 @@
   const status = document.getElementById('jdm-status');
   const retry = document.getElementById('jdm-retry');
   const alerts = document.getElementById('jdm-alerts');
+  const searchForm = document.getElementById('jdm-search');
+  const searchQuery = document.getElementById('jdm-search-query');
+  const searchLeague = document.getElementById('jdm-search-league');
+  const searchDistrict = document.getElementById('jdm-search-district');
+  const searchResults = document.getElementById('jdm-search-results');
   if (!container) return;
   if (location.protocol === 'file:') {
     status.textContent = 'Para consultar datos JDM, abre esta aplicación desde un servidor con la API configurada. El organizador funciona sin conexión.';
     container.innerHTML = '<p>Los partidos y clasificaciones requieren conexión con el servidor.</p>';
     return;
   }
-  const followed = new Set(JSON.parse(localStorage.getItem('jdm-followed-v1') || '[]'));
+  const followed = new Set();
   const seen = JSON.parse(localStorage.getItem('jdm-seen-v1') || '{}');
+  const request = (url, options = {}) => fetch(url, {
+    ...options,
+    headers: { ...options.headers, accept: 'application/json', authorization: `Bearer ${globalThis.__OGS_ACCESS_TOKEN__ || ''}` }
+  });
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const dateValue = value => {
     if (!value) return null;
@@ -21,7 +30,7 @@
   };
   const timeText = value => /^\d{3,4}$/.test(String(value || '')) ? String(value).padStart(4, '0').replace(/(\d{2})(\d{2})/, '$1:$2') : String(value || 'Hora pendiente');
   function render(teams) {
-    if (!teams.length) { container.innerHTML = '<p class="empty-state">No hay equipos disponibles en esta consulta.</p>'; return; }
+    if (!teams.length) { container.innerHTML = '<p class="empty-state">Todavía no sigues ningún equipo. Busca uno por su nombre para añadir sus partidos y clasificación.</p>'; return; }
     container.innerHTML = teams.map(team => {
       const next = (team.fixtures || []).filter(match => match.scheduled && !['F', 'N'].includes(match.status) && (!dateValue(match.date) || dateValue(match.date) >= new Date(Date.now() - 86400000))).slice(0, 5);
       const own = (team.standings || []).find(row => row.teamCode === team.teamCode);
@@ -38,7 +47,7 @@
     }).join('');
   }
   async function checkEvents(slug, quiet = false) {
-    const response = await fetch(`/api/jdm/events?slug=${encodeURIComponent(slug)}&since=${seen[slug] || 0}`);
+    const response = await request(`/api/jdm/events?slug=${encodeURIComponent(slug)}&since=${seen[slug] || 0}`);
     if (!response.ok) throw Error('No se pudieron consultar los cambios');
     const events = await response.json();
     if (!events.length) return;
@@ -60,9 +69,10 @@
     retry.disabled = true;
     status.textContent = 'Consultando la programación oficial…';
     try {
-      const response = await fetch('/api/jdm/teams');
+      const response = await request('/api/jdm/teams');
       if (!response.ok) throw Error('No se pudo consultar JDM');
       const teams = await response.json();
+      teams.forEach(team => followed.add(team.slug));
       render(teams);
       retry.hidden = true;
       status.textContent = '';
@@ -80,12 +90,39 @@
   container.addEventListener('change', async event => {
     const slug = event.target.dataset.follow;
     if (!slug) return;
-    if (event.target.checked) {
-      followed.add(slug);
-      if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
-      await checkEvents(slug, true);
-    } else followed.delete(slug);
-    localStorage.setItem('jdm-followed-v1', JSON.stringify([...followed]));
+    if (event.target.checked) return;
+    const response = await request(`/api/jdm/follows/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+    if (!response.ok) { event.target.checked = true; status.textContent = 'No se pudo dejar de seguir el equipo.'; return; }
+    followed.delete(slug);
+    await update();
+  });
+  let foundTeams = [];
+  searchForm?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const query = searchQuery.value.trim();
+    const league = searchLeague.value.trim();
+    const district = searchDistrict.value.trim();
+    if (query.length < 2 && !league && !district) return;
+    searchResults.textContent = 'Buscando en la fuente oficial…';
+    try {
+      const params = new URLSearchParams({ q: query, league, district });
+      const response = await request(`/api/jdm/search?${params}`);
+      if (!response.ok) throw new Error('No se pudo buscar el equipo');
+      foundTeams = await response.json();
+      searchResults.innerHTML = foundTeams.length ? foundTeams.map((team, index) => `<article class="jdm-search-result"><div><strong>${escape(team.name)}</strong><span>${escape([team.sport, team.group, team.district].filter(Boolean).join(' · '))}</span></div><button type="button" class="secondary" data-follow-result="${index}" ${followed.has(team.slug) ? 'disabled' : ''}>${followed.has(team.slug) ? 'Siguiendo' : 'Seguir equipo'}</button></article>`).join('') : '<p class="empty-state">No se han encontrado equipos con ese nombre.</p>';
+    } catch (error) { searchResults.textContent = error.message; }
+  });
+  searchResults?.addEventListener('click', async event => {
+    const index = event.target.dataset.followResult;
+    if (index == null) return;
+    const team = foundTeams[Number(index)];
+    event.target.disabled = true;
+    const response = await request('/api/jdm/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(team) });
+    if (!response.ok) { event.target.disabled = false; status.textContent = 'No se pudo seguir el equipo.'; return; }
+    followed.add(team.slug);
+    event.target.textContent = 'Siguiendo';
+    if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
+    await update();
   });
   retry.addEventListener('click', update);
   update();

@@ -1,0 +1,21 @@
+{
+  "name": "ogs-lineup-manager",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/copy-static-assets.mjs",
+    "bootstrap:pilots": "node scripts/bootstrap-pilots.mjs",
+    "test": "node --test",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.1.2",
+    "vite": "8.3.4"
+  }
+}
