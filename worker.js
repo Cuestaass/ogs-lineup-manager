@@ -106,7 +106,7 @@ async function provisionPilots(request, env) {
     }
     let team = await env.JDM_DB.prepare('SELECT id,workspace_id FROM teams WHERE external_team_slug=? LIMIT 1').bind(pilot.slug).first();
     if (!team) {
-      team = await env.JDM_DB.prepare("SELECT t.id,t.workspace_id FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE tm.user_id=? AND tm.role='manager' ORDER BY t.created_at LIMIT 1").bind(user.id).first();
+      team = await env.JDM_DB.prepare("SELECT t.id,t.workspace_id FROM teams t JOIN team_members tm ON tm.team_id=t.id LEFT JOIN team_subscriptions ts ON ts.team_id=t.id WHERE tm.user_id=? AND tm.role='manager' AND t.name='Mi equipo' AND t.external_team_slug IS NULL AND COALESCE(ts.plan,'free')='free' AND COALESCE(ts.status,'inactive')='inactive' ORDER BY t.created_at LIMIT 1").bind(user.id).first();
     }
     if (!team) {
       const workspaceId = crypto.randomUUID();
@@ -152,7 +152,7 @@ async function authenticatedApi(request, env, ctx, url) {
   if (url.pathname === '/api/me' && request.method === 'GET') {
     const teams = await env.JDM_DB.prepare("SELECT t.id,t.name,t.sport,t.workspace_id,w.name workspace_name,tm.role FROM teams t JOIN team_members tm ON tm.team_id=t.id JOIN workspaces w ON w.id=t.workspace_id LEFT JOIN team_subscriptions ts ON ts.team_id=t.id WHERE tm.user_id=? AND tm.status=? AND NOT (t.name='Mi equipo' AND t.external_team_slug IS NULL AND COALESCE(ts.plan,'free')='free' AND COALESCE(ts.status,'inactive')='inactive') ORDER BY t.created_at").bind(account.userId, 'active').all();
     const workspace = account.workspace || (teams.results[0] ? { id: teams.results[0].workspace_id, name: teams.results[0].workspace_name } : null);
-    return json({ user: { id: account.userId, name: claimName(claims), email: claims.email || null }, workspace, teams: teams.results.map(({ workspace_id, workspace_name, ...team }) => team) });
+    return json({ user: { id: account.userId, name: claimName(claims), email: claims.email || null }, workspace, teams: teams.results.map(({ workspace_id, workspace_name, ...team }) => ({ ...team, workspace: { id: workspace_id, name: workspace_name } })) });
   }
   const inviteAccept = url.pathname.match(/^\/api\/invites\/([^/]+)\/accept$/);
   if (inviteAccept && request.method === 'POST') {

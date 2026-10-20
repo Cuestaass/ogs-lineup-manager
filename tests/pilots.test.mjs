@@ -19,3 +19,11 @@ test('las altas ordinarias no reciben equipo ni plan automáticamente', async ()
   assert.match(worker, /NOT \(t\.name='Mi equipo'.*ts\.plan.*ts\.status/);
   assert.match(worker, /PILOT_BOOTSTRAP_TOKEN/);
 });
+
+test('un mismo mánager puede administrar varios equipos piloto sin reutilizar uno ya asignado', async () => {
+  const worker = await readFile(new URL('../worker.js', import.meta.url), 'utf8');
+  const provision = worker.match(/async function provisionPilots[\s\S]*?\n}/)?.[0] || '';
+  assert.match(provision, /t\.external_team_slug IS NULL/);
+  assert.match(provision, /COALESCE\(ts\.plan,'free'\)='free'/);
+  assert.match(worker, /workspace: \{ id: workspace_id, name: workspace_name \}/);
+});

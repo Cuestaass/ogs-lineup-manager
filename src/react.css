@@ -73,6 +73,11 @@
   .join-screen { background: linear-gradient(var(--ink) 0 116px, transparent 116px); }
 }
 
+@media (min-width: 1101px) {
+  .sidebar-team-picker { min-width: 190px; margin-bottom: 8px; }
+  .sidebar-team-picker select { min-height: 34px; padding-block: 4px; }
+}
+
 @media (max-width: 620px) {
   .management-main { padding-top: 18px; }
   .management-badge { width: 100%; overflow-wrap: anywhere; }
