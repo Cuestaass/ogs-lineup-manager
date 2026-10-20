@@ -110,7 +110,7 @@ export function getLocalTeams() {
   return PILOTS.flatMap(pilot => {
     const state = read(`pilot-${pilot.slug}`);
     const membership = state.members.find(member => member.user_id === userId && member.status === 'active');
-    return membership ? [{ id: `pilot-${pilot.slug}`, name: pilot.name, role: membership.role }] : [];
+    return membership ? [{ id: `pilot-${pilot.slug}`, name: pilot.name, role: membership.role, workspace: { id: 'pilot-workspace', name: 'Programa piloto' } }] : [];
   });
 }
 

@@ -17,8 +17,10 @@
   font-size: 15px;
 }
 * { box-sizing: border-box; }
-html { scroll-padding-top: 22px; }
-body { margin: 0; min-width: 320px; padding-left: 0; color: var(--text); background: radial-gradient(ellipse at 80% 0%, #fff8dc66, transparent 55%), repeating-linear-gradient(0deg, transparent 0 3px, #514a3405 3px 4px), var(--bg); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+html { max-width: 100%; overflow-x: clip; scroll-padding-top: 22px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; min-width: 320px; max-width: 100%; overflow-x: clip; padding-left: 0; color: var(--text); background: radial-gradient(ellipse at 80% 0%, #fff8dc66, transparent 55%), repeating-linear-gradient(0deg, transparent 0 3px, #514a3405 3px 4px), var(--bg); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+#root, .react-screen, main, header, section, nav, form { min-width: 0; }
+img, video, canvas { max-width: 100%; }
 [hidden] { display: none !important; }
 ::selection { background: var(--marker); color: var(--text); }
 a { color: var(--accent); text-underline-offset: 4px; }
@@ -254,12 +256,24 @@ h3 { font-size: 1rem; }
   .sidebar-open { overflow: hidden; }
   .app-header { padding-right: 74px; }
 }
+@media (max-width: 760px) {
+  .section-heading { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .section-heading > *, .jdm-search > * { min-width: 0; max-width: 100%; }
+  .source-pill { justify-self: start; }
+  .jdm-panel, .jdm-search, .jdm-search-results, .jdm-grid { width: 100%; max-width: 100%; min-width: 0; }
+  .jdm-search { grid-template-columns: minmax(0, 1fr); }
+  .jdm-search :is(input, select, button), .jdm-search-result { min-width: 0; width: 100%; max-width: 100%; }
+  .jdm-search-result { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 600px) {
   :root { --gutter: 18px; }
   .app-sidebar { padding: max(24px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom)); }
-  .app-header { align-items: stretch; padding-top: 24px; padding-right: 70px; gap: 18px; }
-  .app-header h1 { max-width: 100%; font-size: clamp(2.45rem, 13vw, 3.4rem); overflow-wrap: anywhere; }
-  body[data-page="jdm"] .app-header h1 { font-size: clamp(2.25rem, 11vw, 2.65rem); }
+  .app-header { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; padding-top: 24px; padding-right: 70px; gap: 18px; }
+  .app-header > *, .section-heading > *, .jdm-search > * { min-width: 0; max-width: 100%; }
+  .app-header h1 { max-width: 100%; font-size: clamp(2.25rem, 12vw, 3rem); overflow-wrap: anywhere; }
+  body[data-page="jdm"] .app-header h1 { font-size: clamp(2.1rem, 10vw, 2.45rem); }
+  h2 { font-size: clamp(1.7rem, 8.5vw, 2rem); overflow-wrap: anywhere; }
+  .app-header p, .section-heading p { overflow-wrap: anywhere; }
   .header-actions { width: 100%; }
   .header-actions > :is(a, button) { flex: 1 1 auto; }
   .header-actions { gap: 6px; }
@@ -269,8 +283,6 @@ h3 { font-size: 1rem; }
   .summary-grid { gap: 8px 20px; padding-block: 14px; }
   .summary-card { gap: 7px; }
   .summary-card strong { font-size: 1.5rem; }
-  .section-heading { flex-wrap: wrap; align-items: flex-start; }
-  .jdm-search { grid-template-columns: 1fr; }.jdm-search-result { grid-template-columns: 1fr; }
   .team-controls { width: 100%; gap: 6px; }
   .team-controls button { padding-inline: 9px; font-size: .78rem; }
   .team-controls label { width: 82px; }
@@ -297,6 +309,11 @@ h3 { font-size: 1rem; }
   .players-table .name-input { min-width: 0; }
   .players-table .number-input { width: 68px; }
   .players-table button { padding-inline: 6px; font-size: .77rem; }
+}
+@media (max-width: 380px) {
+  :root { --gutter: 14px; }
+  .app-header { padding-right: 64px; }
+  body[data-page="jdm"] .app-header h1 { font-size: 2rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
