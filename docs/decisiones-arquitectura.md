@@ -76,6 +76,7 @@ La aplicación React, la API, las tareas programadas y D1 continuarán en Cloudf
 - `worker.js` como API privada y adaptador JDM.
 - D1 para usuarios internos, workspaces, equipos, membresías y seguimientos.
 - Los roles se asignan por membresía de equipo, no por usuario. Una misma cuenta puede tener roles diferentes en equipos independientes y acumular varios roles dentro del mismo equipo; por ejemplo, `manager + player` o `delegate + player`. Sus permisos son la unión de esos roles.
+- Cuando un equipo está vinculado con su fuente oficial JDM, todos sus miembros activos quedan suscritos automáticamente a sus partidos, clasificación y avisos. Este seguimiento no se puede retirar mientras la membresía siga activa.
 - Cron de Cloudflare para sincronización periódica con JDM.
 
 Supabase Auth y Cloudflare forman despliegues independientes. Un despliegue de la aplicación no configura automáticamente el proyecto Supabase.

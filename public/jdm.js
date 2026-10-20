@@ -43,7 +43,7 @@
       } else if (team.state === 'ambiguous') body = '<p>Hay varios equipos oficiales con este nombre. Es necesario vincular el código y grupo correctos.</p>';
       else if (team.state === 'unavailable') body = `<p>Aún no hay datos de la temporada ${team.season}/${team.season + 1} para este equipo.</p>`;
       else body = '<p>Esperando la primera sincronización con JDM.</p>';
-      return `<article class="jdm-card"><div class="section-heading"><h3>${escape(team.name)}</h3><label class="jdm-follow"><input type="checkbox" data-follow="${escape(team.slug)}" ${followed.has(team.slug) ? 'checked' : ''}> Seguir avisos</label></div>${body}${team.checkedAt ? `<small>Consultado: ${escape(new Date(team.checkedAt).toLocaleString('es-ES'))}</small>` : ''}</article>`;
+      return `<article class="jdm-card"><div class="section-heading"><h3>${escape(team.name)}</h3><label class="jdm-follow"><input type="checkbox" data-follow="${escape(team.slug)}" ${followed.has(team.slug) ? 'checked' : ''} ${team.managedByTeam ? 'disabled' : ''}> ${team.managedByTeam ? 'Incluido por tu equipo' : 'Seguir avisos'}</label></div>${body}${team.checkedAt ? `<small>Consultado: ${escape(new Date(team.checkedAt).toLocaleString('es-ES'))}</small>` : ''}</article>`;
     }).join('');
   }
   async function checkEvents(slug, quiet = false) {
