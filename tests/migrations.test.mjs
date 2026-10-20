@@ -8,6 +8,7 @@ test('las migraciones crean el modelo de equipos, permisos y actividad', () => {
   database.exec(readFileSync(new URL('../migrations/0001_jdm.sql', import.meta.url), 'utf8'));
   database.exec(readFileSync(new URL('../migrations/0002_accounts_and_teams.sql', import.meta.url), 'utf8'));
   database.exec(readFileSync(new URL('../migrations/0003_team_member_roles.sql', import.meta.url), 'utf8'));
+  database.exec(readFileSync(new URL('../migrations/0004_team_competition_follows.sql', import.meta.url), 'utf8'));
   const tables = database.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row => row.name);
   for (const table of ['users', 'workspaces', 'teams', 'team_members', 'team_member_roles', 'team_subscriptions', 'team_invites', 'roster_players', 'callups', 'callup_players', 'match_goals', 'user_follows']) {
     assert.ok(tables.includes(table), `Falta la tabla ${table}`);
@@ -20,6 +21,7 @@ test('un usuario puede tener un rol distinto en cada equipo independiente', () =
   database.exec(readFileSync(new URL('../migrations/0001_jdm.sql', import.meta.url), 'utf8'));
   database.exec(readFileSync(new URL('../migrations/0002_accounts_and_teams.sql', import.meta.url), 'utf8'));
   database.exec(readFileSync(new URL('../migrations/0003_team_member_roles.sql', import.meta.url), 'utf8'));
+  database.exec(readFileSync(new URL('../migrations/0004_team_competition_follows.sql', import.meta.url), 'utf8'));
   database.exec(`
     INSERT INTO users(id,email,display_name) VALUES('user-1','multirol@example.com','Usuario multirol');
     INSERT INTO workspaces(id,name) VALUES('workspace-a','Club A'),('workspace-b','Club B');
@@ -41,6 +43,7 @@ test('un usuario puede acumular manager o delegado y jugador dentro del mismo eq
   database.exec(readFileSync(new URL('../migrations/0001_jdm.sql', import.meta.url), 'utf8'));
   database.exec(readFileSync(new URL('../migrations/0002_accounts_and_teams.sql', import.meta.url), 'utf8'));
   database.exec(readFileSync(new URL('../migrations/0003_team_member_roles.sql', import.meta.url), 'utf8'));
+  database.exec(readFileSync(new URL('../migrations/0004_team_competition_follows.sql', import.meta.url), 'utf8'));
   database.exec(`
     INSERT INTO users(id,email,display_name) VALUES('user-1','doble@example.com','Doble rol');
     INSERT INTO workspaces(id,name) VALUES('workspace-1','Club');
@@ -53,6 +56,30 @@ test('un usuario puede acumular manager o delegado y jugador dentro del mismo eq
   assert.deepEqual(
     database.prepare('SELECT role FROM team_member_roles WHERE team_id=? AND user_id=? ORDER BY role').all('team-1', 'user-1').map(row => row.role),
     ['manager', 'player']
+  );
+  database.close();
+});
+
+test('vincular una fuente oficial permite suscribir automáticamente a todos los miembros', () => {
+  const database = new DatabaseSync(':memory:');
+  database.exec(readFileSync(new URL('../migrations/0001_jdm.sql', import.meta.url), 'utf8'));
+  database.exec(readFileSync(new URL('../migrations/0002_accounts_and_teams.sql', import.meta.url), 'utf8'));
+  database.exec(readFileSync(new URL('../migrations/0003_team_member_roles.sql', import.meta.url), 'utf8'));
+  database.exec(`
+    INSERT INTO users(id,email,display_name) VALUES
+      ('manager','manager@example.com','Mánager'),
+      ('player','player@example.com','Jugador');
+    INSERT INTO workspaces(id,name) VALUES('workspace','Club');
+    INSERT INTO teams(id,workspace_id,name,external_team_slug,external_team_code,external_group_code)
+      VALUES('team','workspace','Equipo','official-slug','123','456');
+    INSERT INTO team_members(team_id,user_id,role,status) VALUES
+      ('team','manager','manager','active'),
+      ('team','player','player','active');
+  `);
+  database.exec(readFileSync(new URL('../migrations/0004_team_competition_follows.sql', import.meta.url), 'utf8'));
+  assert.deepEqual(
+    database.prepare('SELECT user_id,slug FROM user_follows ORDER BY user_id').all().map(row => ({ ...row })),
+    [{ user_id: 'manager', slug: 'official-slug' }, { user_id: 'player', slug: 'official-slug' }]
   );
   database.close();
 });

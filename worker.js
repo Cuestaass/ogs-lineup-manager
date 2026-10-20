@@ -81,6 +81,18 @@ async function allFollowed(env) {
   return rows.results.map(row => ({ slug: row.slug, name: row.name, teamCode: row.team_code, groupCode: row.group_code }));
 }
 
+async function subscribeAssignedTeam(env, userId, teamId) {
+  await env.JDM_DB.prepare("INSERT OR IGNORE INTO user_follows(user_id,slug,name,team_code,group_code) SELECT ?,external_team_slug,name,external_team_code,external_group_code FROM teams WHERE id=? AND external_team_slug IS NOT NULL AND external_team_code IS NOT NULL AND external_group_code IS NOT NULL").bind(userId, teamId).run();
+}
+
+async function subscribeAssignedTeams(env, userId) {
+  await env.JDM_DB.prepare("INSERT OR IGNORE INTO user_follows(user_id,slug,name,team_code,group_code) SELECT tm.user_id,t.external_team_slug,t.name,t.external_team_code,t.external_group_code FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE tm.user_id=? AND tm.status='active' AND t.external_team_slug IS NOT NULL AND t.external_team_code IS NOT NULL AND t.external_group_code IS NOT NULL").bind(userId).run();
+}
+
+async function subscribeAllTeamMembers(env, teamId) {
+  await env.JDM_DB.prepare("INSERT OR IGNORE INTO user_follows(user_id,slug,name,team_code,group_code) SELECT tm.user_id,t.external_team_slug,t.name,t.external_team_code,t.external_group_code FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE t.id=? AND tm.status='active' AND t.external_team_slug IS NOT NULL AND t.external_team_code IS NOT NULL AND t.external_group_code IS NOT NULL").bind(teamId).run();
+}
+
 async function inspectInvite(env, token) {
   const invitation = await env.JDM_DB.prepare('SELECT i.id,i.role,i.mode,i.max_uses,i.use_count,i.expires_at,i.revoked_at,t.name team_name FROM team_invites i JOIN teams t ON t.id=i.team_id WHERE i.token_hash=?').bind(await hashToken(token)).first();
   if (!invitation) return null;
@@ -106,7 +118,7 @@ async function provisionPilots(request, env) {
       results.push({ team: pilot.name, email, state: 'pending-login' });
       continue;
     }
-    let team = await env.JDM_DB.prepare('SELECT id,workspace_id FROM teams WHERE external_team_slug=? LIMIT 1').bind(pilot.slug).first();
+    let team = await env.JDM_DB.prepare('SELECT id,workspace_id FROM teams WHERE pilot_slug=? LIMIT 1').bind(pilot.slug).first();
     if (!team) {
       team = await env.JDM_DB.prepare("SELECT t.id,t.workspace_id FROM teams t JOIN team_members tm ON tm.team_id=t.id JOIN team_member_roles tmr ON tmr.team_id=tm.team_id AND tmr.user_id=tm.user_id LEFT JOIN team_subscriptions ts ON ts.team_id=t.id WHERE tm.user_id=? AND tmr.role='manager' AND t.name='Mi equipo' AND t.external_team_slug IS NULL AND COALESCE(ts.plan,'free')='free' AND COALESCE(ts.status,'inactive')='inactive' ORDER BY t.created_at LIMIT 1").bind(user.id).first();
     }
@@ -116,11 +128,11 @@ async function provisionPilots(request, env) {
       await env.JDM_DB.batch([
         env.JDM_DB.prepare('INSERT INTO workspaces(id,name) VALUES(?,?)').bind(workspaceId, `Espacio de ${pilot.name}`),
         env.JDM_DB.prepare("INSERT INTO workspace_members(workspace_id,user_id,role) VALUES(?,?,'owner')").bind(workspaceId, user.id),
-        env.JDM_DB.prepare('INSERT INTO teams(id,workspace_id,name,external_team_slug) VALUES(?,?,?,?)').bind(teamId, workspaceId, pilot.name, pilot.slug)
+        env.JDM_DB.prepare('INSERT INTO teams(id,workspace_id,name,pilot_slug) VALUES(?,?,?,?)').bind(teamId, workspaceId, pilot.name, pilot.slug)
       ]);
       team = { id: teamId, workspace_id: workspaceId };
     } else {
-      await env.JDM_DB.prepare('UPDATE teams SET name=?,external_team_slug=? WHERE id=?').bind(pilot.name, pilot.slug, team.id).run();
+      await env.JDM_DB.prepare('UPDATE teams SET name=?,pilot_slug=? WHERE id=?').bind(pilot.name, pilot.slug, team.id).run();
     }
     await env.JDM_DB.batch([
       env.JDM_DB.prepare("INSERT INTO workspace_members(workspace_id,user_id,role) VALUES(?,?,'owner') ON CONFLICT(workspace_id,user_id) DO UPDATE SET role='owner'").bind(team.workspace_id, user.id),
@@ -128,6 +140,7 @@ async function provisionPilots(request, env) {
       env.JDM_DB.prepare("INSERT INTO team_member_roles(team_id,user_id,role) VALUES(?,?,'manager') ON CONFLICT(team_id,user_id,role) DO NOTHING").bind(team.id, user.id),
       env.JDM_DB.prepare("INSERT INTO team_subscriptions(team_id,plan,status,billing_owner_user_id,updated_at) VALUES(?,'pilot','active',?,CURRENT_TIMESTAMP) ON CONFLICT(team_id) DO UPDATE SET plan='pilot',status='active',billing_owner_user_id=excluded.billing_owner_user_id,updated_at=CURRENT_TIMESTAMP").bind(team.id, user.id)
     ]);
+    await subscribeAssignedTeam(env, user.id, team.id);
     results.push({ team: pilot.name, email, teamId: team.id, state: 'ready' });
   }
   return json({ pilots: results });
@@ -153,6 +166,7 @@ async function authenticatedApi(request, env, ctx, url) {
   const claims = await authenticate(request, env);
   const account = await ensureAccount(env, claims);
   if (url.pathname === '/api/me' && request.method === 'GET') {
+    await subscribeAssignedTeams(env, account.userId);
     const teams = await env.JDM_DB.prepare("SELECT t.id,t.name,t.sport,t.workspace_id,w.name workspace_name,tm.role legacy_role FROM teams t JOIN team_members tm ON tm.team_id=t.id JOIN workspaces w ON w.id=t.workspace_id LEFT JOIN team_subscriptions ts ON ts.team_id=t.id WHERE tm.user_id=? AND tm.status=? AND NOT (t.name='Mi equipo' AND t.external_team_slug IS NULL AND COALESCE(ts.plan,'free')='free' AND COALESCE(ts.status,'inactive')='inactive') ORDER BY t.created_at").bind(account.userId, 'active').all();
     const roleRows = await env.JDM_DB.prepare('SELECT team_id,role FROM team_member_roles WHERE user_id=?').bind(account.userId).all();
     const rolesByTeam = new Map();
@@ -181,6 +195,7 @@ async function authenticatedApi(request, env, ctx, url) {
       env.JDM_DB.prepare('INSERT INTO team_member_roles(team_id,user_id,role) VALUES(?,?,?)').bind(invitation.team_id, account.userId, invitation.role)
     ]);
     if (invitation.role === 'player') await env.JDM_DB.prepare('INSERT INTO roster_players(id,team_id,user_id,display_name) VALUES(?,?,?,?) ON CONFLICT(team_id,user_id) DO UPDATE SET status=?').bind(crypto.randomUUID(), invitation.team_id, account.userId, claimName(claims), 'active').run();
+    await subscribeAssignedTeam(env, account.userId, invitation.team_id);
     return json({ joined: true, teamId: invitation.team_id, addedRole: invitation.role });
   }
   const accessMatch = url.pathname.match(/^\/api\/teams\/([^/]+)\/access$/);
@@ -254,6 +269,7 @@ async function authenticatedApi(request, env, ctx, url) {
       const body = await request.json();
       if (![body.slug, body.teamCode, body.groupCode].every(value => typeof value === 'string' && value)) return json({ error: 'La vinculación oficial no es válida.' }, 400);
       await env.JDM_DB.prepare('UPDATE teams SET external_team_slug=?,external_team_code=?,external_group_code=? WHERE id=?').bind(body.slug, body.teamCode, body.groupCode, teamId).run();
+      await subscribeAllTeamMembers(env, teamId);
       return json({ linked: true });
     }
     if (resource === 'matches' && request.method === 'GET') {
@@ -304,17 +320,26 @@ async function authenticatedApi(request, env, ctx, url) {
     const body = await request.json();
     if (![body.slug, body.name, body.teamCode, body.groupCode].every(value => typeof value === 'string' && value)) return json({ error: 'Equipo inválido' }, 400);
     await env.JDM_DB.prepare('INSERT INTO user_follows(user_id,slug,name,team_code,group_code) VALUES(?,?,?,?,?) ON CONFLICT(user_id,slug) DO NOTHING').bind(account.userId, body.slug, body.name, body.teamCode, body.groupCode).run();
+    const matchingTeams = await env.JDM_DB.prepare("SELECT t.id FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE tm.user_id=? AND tm.status='active' AND lower(t.name)=lower(?)").bind(account.userId, body.name).all();
+    for (const team of matchingTeams.results) {
+      const access = await teamAccess(env, account.userId, team.id);
+      if (!hasPermission(access?.roles || [], 'team.manage')) continue;
+      await env.JDM_DB.prepare('UPDATE teams SET external_team_slug=?,external_team_code=?,external_group_code=? WHERE id=?').bind(body.slug, body.teamCode, body.groupCode, team.id).run();
+      await subscribeAllTeamMembers(env, team.id);
+    }
     ctx.waitUntil(refresh(env));
     return json({ followed: true }, 201);
   }
   const follow = url.pathname.match(/^\/api\/jdm\/follows\/([^/]+)$/);
   if (follow && request.method === 'DELETE') {
+    const assigned = await env.JDM_DB.prepare("SELECT 1 ok FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE tm.user_id=? AND tm.status='active' AND t.external_team_slug=? LIMIT 1").bind(account.userId, decodeURIComponent(follow[1])).first();
+    if (assigned) return json({ error: 'El seguimiento está incluido por tu pertenencia al equipo.' }, 409);
     await env.JDM_DB.prepare('DELETE FROM user_follows WHERE user_id=? AND slug=?').bind(account.userId, decodeURIComponent(follow[1])).run();
     return json({ followed: false });
   }
   if (url.pathname === '/api/jdm/teams' && request.method === 'GET') {
-    const rows = await env.JDM_DB.prepare('SELECT f.slug,f.name,s.payload,s.checked_at FROM user_follows f LEFT JOIN jdm_snapshots s ON s.slug=f.slug WHERE f.user_id=? ORDER BY f.name').bind(account.userId).all();
-    return json(rows.results.map(row => row.payload ? { ...JSON.parse(row.payload), checkedAt: row.checked_at, followed: true } : { slug: row.slug, name: row.name, state: 'pending', fixtures: [], standings: [], followed: true }));
+    const rows = await env.JDM_DB.prepare("SELECT f.slug,f.name,s.payload,s.checked_at,EXISTS(SELECT 1 FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE tm.user_id=f.user_id AND tm.status='active' AND t.external_team_slug=f.slug) managed_by_team FROM user_follows f LEFT JOIN jdm_snapshots s ON s.slug=f.slug WHERE f.user_id=? ORDER BY f.name").bind(account.userId).all();
+    return json(rows.results.map(row => row.payload ? { ...JSON.parse(row.payload), checkedAt: row.checked_at, followed: true, managedByTeam: Boolean(row.managed_by_team) } : { slug: row.slug, name: row.name, state: 'pending', fixtures: [], standings: [], followed: true, managedByTeam: Boolean(row.managed_by_team) }));
   }
   if (url.pathname === '/api/jdm/events' && request.method === 'GET') {
     const slug = url.searchParams.get('slug');
@@ -348,6 +373,7 @@ export default {
         } else response = await authenticatedApi(request, env, ctx, url);
       }
     } catch (error) {
+      console.error('Worker request failed', { method: request.method, path: url.pathname, error: error instanceof Error ? error.stack || error.message : String(error) });
       response = error instanceof Response ? (error.status === 401 ? json({ error: 'No autorizado' }, 401) : error) : json({ error: 'Error interno' }, 500);
     }
     return withCors(response, request, env);

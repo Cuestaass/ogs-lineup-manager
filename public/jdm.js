@@ -1,3 +1,5 @@
+import { createCalendar, fixtureCount, googleCalendarUrl } from './calendar.js';
+
 (() => {
   const container = document.getElementById('jdm-teams');
   const status = document.getElementById('jdm-status');
@@ -8,6 +10,7 @@
   const searchLeague = document.getElementById('jdm-search-league');
   const searchDistrict = document.getElementById('jdm-search-district');
   const searchResults = document.getElementById('jdm-search-results');
+  const exportCalendar = document.getElementById('jdm-export-calendar');
   if (!container) return;
   if (location.protocol === 'file:') {
     status.textContent = 'Para consultar datos JDM, abre esta aplicación desde un servidor con la API configurada. El organizador funciona sin conexión.';
@@ -15,6 +18,7 @@
     return;
   }
   const followed = new Set();
+  let currentTeams = [];
   const seen = JSON.parse(localStorage.getItem('jdm-seen-v1') || '{}');
   const request = (url, options = {}) => fetch(`${globalThis.__OGS_API_URL__ || ''}${url}`, {
     ...options,
@@ -38,12 +42,12 @@
       if (team.state === 'ready') {
         body = `<p>${escape(team.sport)} · ${escape(team.group)} · ${escape(team.district)}</p>
           <p><strong>Clasificación:</strong> ${own ? `<span class="standing-position">${escape(own.position)}.º</span> · ${escape(own.points)} puntos · ${escape(own.played)} partidos` : 'Sin datos'}</p>
-          <h4>Próximos partidos</h4>${next.length ? `<ul class="fixture-list">${next.map(match => `<li><div class="fixture-date"><strong>${escape(timeText(match.time))}</strong><span>${escape(match.date || 'Fecha pendiente')}</span></div><div><strong>${escape(match.home)} – ${escape(match.away)}</strong><span>${escape(match.venue || 'Campo pendiente')}</span></div></li>`).join('')}</ul>` : '<p>Sin partidos programados.</p>'}
+          <h4>Próximos partidos</h4>${next.length ? `<ul class="fixture-list">${next.map(match => `<li><div class="fixture-date"><strong>${escape(timeText(match.time))}</strong><span>${escape(match.date || 'Fecha pendiente')}</span></div><div class="fixture-summary"><strong>${escape(match.home)} – ${escape(match.away)}</strong><span>${escape(match.venue || 'Campo pendiente')}</span></div><a class="fixture-calendar-link" href="${escape(googleCalendarUrl(team, match))}" target="_blank" rel="noopener noreferrer" aria-label="Añadir ${escape(match.home)} contra ${escape(match.away)} a Google Calendar">Google Calendar</a></li>`).join('')}</ul>` : '<p>Sin partidos programados.</p>'}
           <details><summary>Ver clasificación completa</summary><div class="table-wrap"><table class="standings-table"><caption class="sr-only">Clasificación de ${escape(team.name)}</caption><thead><tr><th scope="col">Pos.</th><th scope="col">Equipo</th><th scope="col">PJ</th><th scope="col">Pts.</th></tr></thead><tbody>${team.standings.map(row => `<tr ${row.teamCode === team.teamCode ? 'class="own-team"' : ''}><td>${escape(row.position)}</td><th scope="row">${escape(row.team)}</th><td>${escape(row.played)}</td><td>${escape(row.points)}</td></tr>`).join('')}</tbody></table></div></details>`;
       } else if (team.state === 'ambiguous') body = '<p>Hay varios equipos oficiales con este nombre. Es necesario vincular el código y grupo correctos.</p>';
       else if (team.state === 'unavailable') body = `<p>Aún no hay datos de la temporada ${team.season}/${team.season + 1} para este equipo.</p>`;
       else body = '<p>Esperando la primera sincronización con JDM.</p>';
-      return `<article class="jdm-card"><div class="section-heading"><h3>${escape(team.name)}</h3><label class="jdm-follow"><input type="checkbox" data-follow="${escape(team.slug)}" ${followed.has(team.slug) ? 'checked' : ''}> Seguir avisos</label></div>${body}${team.checkedAt ? `<small>Consultado: ${escape(new Date(team.checkedAt).toLocaleString('es-ES'))}</small>` : ''}</article>`;
+      return `<article class="jdm-card"><div class="section-heading"><h3>${escape(team.name)}</h3><label class="jdm-follow"><input type="checkbox" data-follow="${escape(team.slug)}" ${followed.has(team.slug) ? 'checked' : ''} ${team.managedByTeam ? 'disabled' : ''}> ${team.managedByTeam ? 'Incluido por tu equipo' : 'Seguir avisos'}</label></div>${body}${team.checkedAt ? `<small>Consultado: ${escape(new Date(team.checkedAt).toLocaleString('es-ES'))}</small>` : ''}</article>`;
     }).join('');
   }
   async function checkEvents(slug, quiet = false) {
@@ -72,8 +76,14 @@
       const response = await request('/api/jdm/teams');
       if (!response.ok) throw Error('No se pudo consultar JDM');
       const teams = await response.json();
+      currentTeams = teams;
       teams.forEach(team => followed.add(team.slug));
       render(teams);
+      const calendarMatches = fixtureCount(teams);
+      if (exportCalendar) {
+        exportCalendar.disabled = calendarMatches === 0;
+        exportCalendar.textContent = calendarMatches ? `Exportar calendario (${calendarMatches})` : 'Sin partidos para exportar';
+      }
       retry.hidden = true;
       status.textContent = '';
       for (const slug of followed) await checkEvents(slug);
@@ -125,6 +135,25 @@
     await update();
   });
   retry.addEventListener('click', update);
+  exportCalendar?.addEventListener('click', () => {
+    const calendar = createCalendar(currentTeams);
+    const file = new File([calendar], 'partidos-cuaderno-de-campo.ics', { type: 'text/calendar;charset=utf-8' });
+    if (navigator.canShare?.({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Calendario de partidos', text: 'Añadir partidos al calendario' }).catch(error => {
+        if (error.name !== 'AbortError') status.textContent = 'No se pudo compartir el calendario.';
+      });
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file.name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    status.textContent = 'Calendario descargado. Abre el archivo para añadirlo a tu calendario.';
+  });
   update();
   setInterval(update, 5 * 60 * 1000);
 })();
