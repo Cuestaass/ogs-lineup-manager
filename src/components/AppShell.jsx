@@ -46,7 +46,7 @@ export function AppShell({ page, children }) {
       <nav className="sidebar-nav" aria-label="Navegación principal">{visibleItems.map(([key, href, label, icon]) => <a key={key} href={href} aria-current={key === page ? 'page' : undefined} onClick={() => setOpen(false)}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{icon}</svg><span>{label}</span></a>)}</nav>
       <div className="sidebar-footer">
         {account.teams.length > 1 && <label className="sidebar-team-picker"><span>EQUIPO ACTIVO</span><select value={activeTeam?.id || ''} onChange={event => selectTeam(event.target.value)}>{account.teams.map(team => <option key={team.id} value={team.id}>{team.name} · {roleLabel(team.role)}</option>)}</select></label>}
-        <div>{activeTeam ? <>{name}<br/>{activeTeam.workspace?.name || account.workspace?.name || 'Espacio de equipo'}</> : <>Cuenta activa<br/>{account.user?.email || 'Sin equipo asignado'}</>}</div>
+        <div>{activeTeam ? <>{name}<br/>{roleLabel(activeTeam.role)} · {activeTeam.workspace?.name || account.workspace?.name || 'Espacio de equipo'}</> : <>Cuenta activa<br/>{account.user?.email || 'Sin equipo asignado'}</>}</div>
         <button className="sidebar-logout" type="button" onClick={logout}>Cerrar sesión</button>
       </div>
     </aside>

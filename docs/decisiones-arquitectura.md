@@ -75,6 +75,7 @@ La aplicación React, la API, las tareas programadas y D1 continuarán en Cloudf
 - React compilado en `public-build/` y publicado en Cloudflare Pages.
 - `worker.js` como API privada y adaptador JDM.
 - D1 para usuarios internos, workspaces, equipos, membresías y seguimientos.
+- El rol se asigna por membresía de equipo, no por usuario: una misma cuenta puede ser mánager, delegado o jugador en equipos distintos, incluso pertenecientes a workspaces independientes.
 - Cron de Cloudflare para sincronización periódica con JDM.
 
 Supabase Auth y Cloudflare forman despliegues independientes. Un despliegue de la aplicación no configura automáticamente el proyecto Supabase.
