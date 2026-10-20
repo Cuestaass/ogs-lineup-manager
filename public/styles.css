@@ -225,6 +225,8 @@ h3 { font-size: 1rem; }
 .jdm-main { padding-top: 28px; }
 .jdm-panel { border-top: 0; padding-top: 0; margin-top: 0; }
 .source-pill { color: var(--muted); font-size: .76rem; }
+.jdm-calendar-actions { display: grid; justify-items: end; gap: 8px; }
+.jdm-calendar-actions small { color: var(--muted); font-size: .68rem; }
 .jdm-grid { display: grid; gap: 0; }
 .jdm-card { padding: 24px 0; border-top: 2px solid var(--text); }
 .jdm-card h3 { font-family: var(--number); font-weight: 700; text-transform: uppercase; font-size: 2rem; margin: 0; }
@@ -322,8 +324,10 @@ h3 { font-size: 1rem; }
 /* Competition uses the same ruled rows and aligned sporting numbers. */
 .standing-position { font-family: var(--display); font-size: 1.8rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 .fixture-list { list-style: none; padding: 0; margin: 0; }
-.fixture-list li { display: grid; grid-template-columns: 125px minmax(0, 1fr); gap: 20px; padding: 12px 0; margin: 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.fixture-list li { display: grid; grid-template-columns: 125px minmax(0, 1fr) auto; align-items: center; gap: 20px; padding: 12px 0; margin: 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
 .fixture-list span { display: block; font-size: .78rem; color: var(--muted); }
+.fixture-summary { min-width: 0; }
+.fixture-calendar-link { min-height: 44px; display: inline-flex; align-items: center; color: var(--text); font-size: .76rem; font-weight: 700; text-underline-offset: 4px; }
 .fixture-date strong { font-family: monospace; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
 .standings-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
 .standings-table td, .standings-table th { padding: 10px; border-bottom: 1px solid var(--border); text-align: left; }
@@ -333,7 +337,13 @@ h3 { font-size: 1rem; }
 .standings-table .own-team { background: var(--accent-dark); }
 .standings-table .own-team th { border-left: 3px solid var(--text); }
 #jdm-retry { margin-bottom: 20px; }
-@media (max-width: 600px) { .fixture-list li { grid-template-columns: 92px minmax(0,1fr); gap: 12px; } }
+@media (max-width: 600px) {
+  .jdm-calendar-actions { width: 100%; justify-items: stretch; }
+  .jdm-calendar-actions .source-pill { justify-self: start; }
+  .jdm-calendar-actions button { width: 100%; }
+  .fixture-list li { grid-template-columns: 82px minmax(0,1fr); gap: 8px 12px; }
+  .fixture-calendar-link { grid-column: 2; width: fit-content; }
+}
 
 /* The masthead behaves like the colophon of a club publication. */
 @media (min-width: 1101px) {

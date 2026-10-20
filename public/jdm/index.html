@@ -24,7 +24,7 @@
   </header>
   <main class="jdm-main" id="main-content">
     <section class="panel jdm-panel">
-      <div class="section-heading"><div><p class="eyebrow">01 / SEGUIMIENTO</p><h2>Cuaderno de competición</h2><p>Sólo los equipos que tú sigues</p></div><span class="source-pill">Fuente oficial · Madrid</span></div>
+      <div class="section-heading"><div><p class="eyebrow">01 / SEGUIMIENTO</p><h2>Cuaderno de competición</h2><p>Sólo los equipos que tú sigues</p></div><div class="jdm-calendar-actions"><span class="source-pill">Fuente oficial · Madrid</span><button id="jdm-export-calendar" class="secondary" type="button" disabled>Sin partidos para exportar</button><small>Compatible con Apple, Android y Google Calendar</small></div></div>
       <form id="jdm-search" class="jdm-search" role="search">
         <label><span>Buscar un equipo en JDM Madrid</span><input id="jdm-search-query" type="search" minlength="2" placeholder="Nombre del equipo" autocomplete="off"></label>
         <label><span>Liga o grupo</span><input id="jdm-search-league" type="search" placeholder="Ej. Liga Centro" autocomplete="off"></label>
@@ -40,6 +40,6 @@
     </section>
   </main>
   <script src="../shell.js"></script>
-  <script src="../jdm.js"></script>
+  <script type="module" src="../jdm.js"></script>
 </body>
 </html>
