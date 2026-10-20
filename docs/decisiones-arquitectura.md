@@ -54,7 +54,7 @@ Consecuencias:
 
 ### Estado técnico
 
-La aplicación usa `@supabase/supabase-js` para registro, acceso, recuperación, renovación y cierre de sesión. El Worker valida firma, emisor, audiencia y caducidad contra el JWKS del proyecto mediante `jose`, y conserva el aprovisionamiento automático del primer `workspace` y equipo. Antes de producción sigue siendo necesaria una prueba de extremo a extremo contra el proyecto Supabase definitivo.
+La aplicación usa `@supabase/supabase-js` para registro, acceso, recuperación, renovación y cierre de sesión. El Worker valida firma, emisor, audiencia y caducidad contra el JWKS del proyecto mediante `jose`. El primer acceso sólo registra la identidad: el usuario no recibe equipo ni rol hasta aceptar una invitación o ser asignado explícitamente como mánager. Antes de producción sigue siendo necesaria una prueba de extremo a extremo contra el proyecto Supabase definitivo.
 
 ### Configuración externa pendiente en Supabase
 

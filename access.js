@@ -6,7 +6,21 @@ export const ROLE_PERMISSIONS = Object.freeze({
   player: ['callups.respond']
 });
 
+export const PAGE_PERMISSIONS = Object.freeze({
+  equipo: null,
+  organizador: 'lineups.manage',
+  tactica: 'tactics.manage',
+  jdm: 'authenticated'
+});
+
 export const hasPermission = (role, permission) => Boolean(ROLE_PERMISSIONS[role]?.includes(permission));
+
+export function canAccessPage(role, page) {
+  const permission = PAGE_PERMISSIONS[page];
+  if (permission === 'authenticated') return true;
+  if (permission == null) return TEAM_ROLES.includes(role);
+  return hasPermission(role, permission);
+}
 
 export function validateInvite(input) {
   const role = input?.role;

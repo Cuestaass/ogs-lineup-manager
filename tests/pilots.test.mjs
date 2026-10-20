@@ -11,8 +11,11 @@ test('limita el programa sin pago a los tres equipos piloto acordados', () => {
   ]);
 });
 
-test('las altas ordinarias no reciben el plan piloto automáticamente', async () => {
+test('las altas ordinarias no reciben equipo ni plan automáticamente', async () => {
   const worker = await readFile(new URL('../worker.js', import.meta.url), 'utf8');
-  assert.match(worker, /VALUES\(\?,'free','inactive',\?\)/);
+  const ensureAccount = worker.match(/async function ensureAccount[\s\S]*?\n}/)?.[0] || '';
+  assert.doesNotMatch(ensureAccount, /INSERT INTO teams/);
+  assert.doesNotMatch(ensureAccount, /INSERT INTO team_members/);
+  assert.match(worker, /NOT \(t\.name='Mi equipo'.*ts\.plan.*ts\.status/);
   assert.match(worker, /PILOT_BOOTSTRAP_TOKEN/);
 });

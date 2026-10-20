@@ -55,25 +55,12 @@ async function ensureAccount(env, claims) {
   const userId = String(claims.sub);
   const displayName = claimName(claims);
   await env.JDM_DB.prepare('INSERT INTO users(id,email,display_name) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET email=excluded.email,display_name=excluded.display_name').bind(userId, claims.email || null, displayName).run();
-  let workspace = await env.JDM_DB.prepare('SELECT w.id,w.name FROM workspaces w JOIN workspace_members wm ON wm.workspace_id=w.id WHERE wm.user_id=? ORDER BY w.created_at LIMIT 1').bind(userId).first();
-  if (!workspace) {
-    const workspaceId = crypto.randomUUID();
-    const teamId = crypto.randomUUID();
-    const ownerName = claims.user_metadata?.full_name || claims.given_name || claims.name || 'Mi';
-    await env.JDM_DB.batch([
-      env.JDM_DB.prepare('INSERT INTO workspaces(id,name) VALUES(?,?)').bind(workspaceId, `Espacio de ${ownerName}`),
-      env.JDM_DB.prepare("INSERT INTO workspace_members(workspace_id,user_id,role) VALUES(?,?,'owner')").bind(workspaceId, userId),
-      env.JDM_DB.prepare('INSERT INTO teams(id,workspace_id,name) VALUES(?,?,?)').bind(teamId, workspaceId, 'Mi equipo'),
-      env.JDM_DB.prepare("INSERT INTO team_members(team_id,user_id,role) VALUES(?,?,'manager')").bind(teamId, userId),
-      env.JDM_DB.prepare("INSERT INTO team_subscriptions(team_id,plan,status,billing_owner_user_id) VALUES(?,'free','inactive',?)").bind(teamId, userId)
-    ]);
-    workspace = { id: workspaceId, name: `Espacio de ${ownerName}` };
-  }
+  const workspace = await env.JDM_DB.prepare('SELECT w.id,w.name FROM workspaces w JOIN workspace_members wm ON wm.workspace_id=w.id WHERE wm.user_id=? ORDER BY w.created_at LIMIT 1').bind(userId).first();
   return { userId, workspace };
 }
 
 async function teamAccess(env, userId, teamId) {
-  const member = await env.JDM_DB.prepare('SELECT role,status FROM team_members WHERE team_id=? AND user_id=?').bind(teamId, userId).first();
+  const member = await env.JDM_DB.prepare("SELECT tm.role,tm.status FROM team_members tm JOIN teams t ON t.id=tm.team_id LEFT JOIN team_subscriptions ts ON ts.team_id=t.id WHERE tm.team_id=? AND tm.user_id=? AND NOT (t.name='Mi equipo' AND t.external_team_slug IS NULL AND COALESCE(ts.plan,'free')='free' AND COALESCE(ts.status,'inactive')='inactive')").bind(teamId, userId).first();
   if (!member || member.status !== 'active') return null;
   const subscription = await env.JDM_DB.prepare('SELECT plan,status,current_period_end FROM team_subscriptions WHERE team_id=?').bind(teamId).first();
   return { role: member.role, subscription: subscription || { plan: 'free', status: 'inactive' } };
@@ -134,6 +121,7 @@ async function provisionPilots(request, env) {
       await env.JDM_DB.prepare('UPDATE teams SET name=?,external_team_slug=? WHERE id=?').bind(pilot.name, pilot.slug, team.id).run();
     }
     await env.JDM_DB.batch([
+      env.JDM_DB.prepare("INSERT INTO workspace_members(workspace_id,user_id,role) VALUES(?,?,'owner') ON CONFLICT(workspace_id,user_id) DO UPDATE SET role='owner'").bind(team.workspace_id, user.id),
       env.JDM_DB.prepare("INSERT INTO team_members(team_id,user_id,role,status) VALUES(?,?,'manager','active') ON CONFLICT(team_id,user_id) DO UPDATE SET role='manager',status='active'").bind(team.id, user.id),
       env.JDM_DB.prepare("INSERT INTO team_subscriptions(team_id,plan,status,billing_owner_user_id,updated_at) VALUES(?,'pilot','active',?,CURRENT_TIMESTAMP) ON CONFLICT(team_id) DO UPDATE SET plan='pilot',status='active',billing_owner_user_id=excluded.billing_owner_user_id,updated_at=CURRENT_TIMESTAMP").bind(team.id, user.id)
     ]);
@@ -162,8 +150,9 @@ async function authenticatedApi(request, env, ctx, url) {
   const claims = await authenticate(request, env);
   const account = await ensureAccount(env, claims);
   if (url.pathname === '/api/me' && request.method === 'GET') {
-    const teams = await env.JDM_DB.prepare('SELECT t.id,t.name,t.sport,tm.role FROM teams t JOIN team_members tm ON tm.team_id=t.id WHERE tm.user_id=? AND tm.status=? ORDER BY t.created_at').bind(account.userId, 'active').all();
-    return json({ user: { id: account.userId, name: claimName(claims), email: claims.email || null }, workspace: account.workspace, teams: teams.results });
+    const teams = await env.JDM_DB.prepare("SELECT t.id,t.name,t.sport,t.workspace_id,w.name workspace_name,tm.role FROM teams t JOIN team_members tm ON tm.team_id=t.id JOIN workspaces w ON w.id=t.workspace_id LEFT JOIN team_subscriptions ts ON ts.team_id=t.id WHERE tm.user_id=? AND tm.status=? AND NOT (t.name='Mi equipo' AND t.external_team_slug IS NULL AND COALESCE(ts.plan,'free')='free' AND COALESCE(ts.status,'inactive')='inactive') ORDER BY t.created_at").bind(account.userId, 'active').all();
+    const workspace = account.workspace || (teams.results[0] ? { id: teams.results[0].workspace_id, name: teams.results[0].workspace_name } : null);
+    return json({ user: { id: account.userId, name: claimName(claims), email: claims.email || null }, workspace, teams: teams.results.map(({ workspace_id, workspace_name, ...team }) => team) });
   }
   const inviteAccept = url.pathname.match(/^\/api\/invites\/([^/]+)\/accept$/);
   if (inviteAccept && request.method === 'POST') {
@@ -175,7 +164,12 @@ async function authenticatedApi(request, env, ctx, url) {
     if (existing) return json({ error: 'Ya perteneces a este equipo.', role: existing.role }, 409);
     const consumed = await env.JDM_DB.prepare('UPDATE team_invites SET use_count=use_count+1 WHERE id=? AND revoked_at IS NULL AND expires_at>? AND use_count<max_uses').bind(invitation.id, new Date().toISOString()).run();
     if (consumed.meta?.changes !== 1) return json({ error: 'La invitación ya no está disponible.' }, 410);
-    await env.JDM_DB.prepare('INSERT INTO team_members(team_id,user_id,role,status) VALUES(?,?,?,?)').bind(invitation.team_id, account.userId, invitation.role, 'active').run();
+    const invitedTeam = await env.JDM_DB.prepare('SELECT workspace_id FROM teams WHERE id=?').bind(invitation.team_id).first();
+    if (!invitedTeam) return json({ error: 'El equipo de la invitación ya no existe.' }, 410);
+    await env.JDM_DB.batch([
+      env.JDM_DB.prepare("INSERT INTO workspace_members(workspace_id,user_id,role) VALUES(?,?,'member') ON CONFLICT(workspace_id,user_id) DO NOTHING").bind(invitedTeam.workspace_id, account.userId),
+      env.JDM_DB.prepare('INSERT INTO team_members(team_id,user_id,role,status) VALUES(?,?,?,?)').bind(invitation.team_id, account.userId, invitation.role, 'active')
+    ]);
     if (invitation.role === 'player') await env.JDM_DB.prepare('INSERT INTO roster_players(id,team_id,user_id,display_name) VALUES(?,?,?,?) ON CONFLICT(team_id,user_id) DO UPDATE SET status=?').bind(crypto.randomUUID(), invitation.team_id, account.userId, claimName(claims), 'active').run();
     return json({ joined: true, teamId: invitation.team_id, role: invitation.role });
   }

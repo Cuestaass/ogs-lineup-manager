@@ -8,7 +8,7 @@ Las decisiones sobre proveedores, responsabilidades y despliegues independientes
 
 - **Frontend:** React + Vite en Cloudflare Pages, con las rutas `/organizador/`, `/tactica/`, `/jdm/`, `/equipo/`, `/unirse/` y `/login/`.
 - **Identidad:** Supabase Auth con correo y contraseña, confirmación, recuperación de contraseña y renovación automática de sesión.
-- **API:** Cloudflare Worker independiente. Valida cada JWT de Supabase mediante JWKS y aprovisiona en el primer acceso un usuario, un workspace personal y un equipo.
+- **API:** Cloudflare Worker independiente. Valida cada JWT de Supabase mediante JWKS y registra la identidad interna. El equipo sólo aparece tras una invitación o asignación explícita de mánager.
 - **Datos:** Cloudflare D1 guarda membresías, roles, suscripciones, invitaciones, convocatorias y equipos JDM seguidos.
 - **Tareas:** el Worker sincroniza JDM cada tres horas mediante Cron Triggers.
 - Las alineaciones y la pizarra táctica conservan por ahora la persistencia del navegador, aislada por `team_id`.

@@ -1,6 +1,16 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { AppShell } from './AppShell.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { hasPermission } from '../../access.js';
+
+function filterMarkup(markup, role) {
+  const template = document.createElement('template');
+  template.innerHTML = markup;
+  template.content.querySelectorAll('[data-permission]').forEach(element => {
+    if (!hasPermission(role, element.dataset.permission)) element.remove();
+  });
+  return template.innerHTML;
+}
 
 export function LegacyPage({ page, markup, loadController }) {
   const { activeTeam } = useAuth();
@@ -12,6 +22,6 @@ export function LegacyPage({ page, markup, loadController }) {
   useEffect(() => {
     if (ready) loadController();
   }, [ready, loadController]);
-  const screenMarkup = activeTeam ? markup.replaceAll('FC OGS', activeTeam.name) : markup;
+  const screenMarkup = useMemo(() => filterMarkup(activeTeam ? markup.replaceAll('FC OGS', activeTeam.name) : markup, activeTeam?.role), [activeTeam, markup]);
   return <AppShell page={page}>{ready && <div className="react-screen" dangerouslySetInnerHTML={{ __html: screenMarkup }}/>}</AppShell>;
 }
