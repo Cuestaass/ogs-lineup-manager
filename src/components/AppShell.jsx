@@ -8,7 +8,8 @@ const items = [
   ['tactica', '/tactica/', 'Pizarra táctica', <><path d="M4 4h16v16H4zM12 4v16"/><circle cx="12" cy="12" r="3"/><path d="M7 8l2 2m6 4 2 2"/></>],
   ['jdm', '/jdm/', 'Partidos y clasificación', <path d="M4 19V5m0 0h16v14H4zM8 15l3-3 2 2 3-4"/>]
 ];
-const roleLabel = role => ({ manager: 'Mánager', delegate: 'Delegado', player: 'Jugador' })[role] || role;
+const roleName = role => ({ manager: 'Mánager', delegate: 'Delegado', player: 'Jugador' })[role] || role;
+const roleLabel = team => (team.roles?.length ? team.roles : [team.role]).map(roleName).join(' + ');
 
 export function AppShell({ page, children }) {
   const { account, activeTeam, selectTeam, logout } = useAuth();
@@ -31,7 +32,7 @@ export function AppShell({ page, children }) {
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [page, open]);
-  const visibleItems = items.filter(([key]) => canAccessPage(activeTeam?.role, key));
+  const visibleItems = items.filter(([key]) => canAccessPage(activeTeam?.roles || activeTeam?.role, key));
   const name = activeTeam?.name || 'Sin equipo';
   const home = visibleItems[0]?.[1] || '/jdm/';
   return <>
@@ -45,8 +46,8 @@ export function AppShell({ page, children }) {
       <p className="sidebar-caption">ESPACIO DE EQUIPO</p>
       <nav className="sidebar-nav" aria-label="Navegación principal">{visibleItems.map(([key, href, label, icon]) => <a key={key} href={href} aria-current={key === page ? 'page' : undefined} onClick={() => setOpen(false)}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{icon}</svg><span>{label}</span></a>)}</nav>
       <div className="sidebar-footer">
-        {account.teams.length > 1 && <label className="sidebar-team-picker"><span>EQUIPO ACTIVO</span><select value={activeTeam?.id || ''} onChange={event => selectTeam(event.target.value)}>{account.teams.map(team => <option key={team.id} value={team.id}>{team.name} · {roleLabel(team.role)}</option>)}</select></label>}
-        <div>{activeTeam ? <>{name}<br/>{roleLabel(activeTeam.role)} · {activeTeam.workspace?.name || account.workspace?.name || 'Espacio de equipo'}</> : <>Cuenta activa<br/>{account.user?.email || 'Sin equipo asignado'}</>}</div>
+        {account.teams.length > 1 && <label className="sidebar-team-picker"><span>EQUIPO ACTIVO</span><select value={activeTeam?.id || ''} onChange={event => selectTeam(event.target.value)}>{account.teams.map(team => <option key={team.id} value={team.id}>{team.name} · {roleLabel(team)}</option>)}</select></label>}
+        <div>{activeTeam ? <>{name}<br/>{roleLabel(activeTeam)} · {activeTeam.workspace?.name || account.workspace?.name || 'Espacio de equipo'}</> : <>Cuenta activa<br/>{account.user?.email || 'Sin equipo asignado'}</>}</div>
         <button className="sidebar-logout" type="button" onClick={logout}>Cerrar sesión</button>
       </div>
     </aside>

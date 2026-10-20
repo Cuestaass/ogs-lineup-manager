@@ -1,5 +1,5 @@
 import { PILOT_TEAMS as PILOTS } from '../../pilots.js';
-import { ROLE_PERMISSIONS } from '../../access.js';
+import { permissionsForRoles, primaryRole } from '../../access.js';
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
 const currentPilot = () => PILOTS.find(pilot => pilot.slug === JSON.parse(sessionStorage.getItem('ogs-session-v1') || '{}').profile?.pilotSlug) || PILOTS[0];
@@ -9,7 +9,7 @@ const key = teamId => `ogs-local-team-api-v1:${teamId}`;
 function initial(teamId) {
   const pilot = PILOTS.find(item => `pilot-${item.slug}` === teamId) || currentPilot();
   return {
-    members: [{ user_id: `pilot-manager-${pilot.slug}`, role: 'manager', status: 'active', display_name: `Manager · ${pilot.name}`, email: `${pilot.slug}@piloto.local` }],
+    members: [{ user_id: `pilot-manager-${pilot.slug}`, role: 'manager', roles: ['manager'], status: 'active', display_name: `Manager · ${pilot.name}`, email: `${pilot.slug}@piloto.local` }],
     invites: [], roster: [], callups: [],
     matches: [{ id: `${teamId}:pilot-final`, date: '10/10/2026', home: pilot.name, away: 'Rival piloto', status: 'F' }],
     goals: [], teamId
@@ -26,8 +26,9 @@ export async function localApi(path, options = {}) {
     const resource = team[2];
     const state = read(teamId);
     const membership = state.members.find(member => member.user_id === currentUser().sub);
-    const role = membership?.role || 'manager';
-    if (resource === 'access') return json({ role, subscription: { plan: 'pilot', status: 'active' }, permissions: [...ROLE_PERMISSIONS[role]], teamManagementEnabled: true });
+    const roles = membership?.roles || [membership?.role || 'manager'];
+    const role = primaryRole(roles);
+    if (resource === 'access') return json({ role, roles, subscription: { plan: 'pilot', status: 'active' }, permissions: permissionsForRoles(roles), teamManagementEnabled: true });
     if (options.method === 'POST') {
       const body = JSON.parse(options.body || '{}');
       if (resource === 'invites') {
@@ -77,7 +78,11 @@ export async function localApi(path, options = {}) {
       if (!valid) return json({ error: 'La invitación ya no está disponible.' }, 410);
       const profile = currentUser();
       if (!profile.sub) return json({ error: 'Debes identificarte antes de aceptar la invitación.' }, 401);
-      if (!state.members.some(member => member.user_id === profile.sub)) state.members.push({ user_id: profile.sub, role: invite.role, status: 'active', display_name: profile.name || 'Usuario piloto', email: `${profile.pilotSlug || 'usuario'}@piloto.local` });
+      const member = state.members.find(item => item.user_id === profile.sub);
+      if (member) {
+        member.roles = [...new Set([...(member.roles || [member.role]), invite.role])];
+        member.role = primaryRole(member.roles);
+      } else state.members.push({ user_id: profile.sub, role: invite.role, roles: [invite.role], status: 'active', display_name: profile.name || 'Usuario piloto', email: `${profile.pilotSlug || 'usuario'}@piloto.local` });
       if (invite.role === 'player' && !state.roster.some(player => player.user_id === profile.sub)) state.roster.push({ id: crypto.randomUUID(), user_id: profile.sub, display_name: profile.name || 'Jugador piloto', number: null, status: 'active' });
       invite.use_count += 1; write(teamId, state); return json({ joined: true, teamId, role: invite.role });
     }
@@ -110,7 +115,8 @@ export function getLocalTeams() {
   return PILOTS.flatMap(pilot => {
     const state = read(`pilot-${pilot.slug}`);
     const membership = state.members.find(member => member.user_id === userId && member.status === 'active');
-    return membership ? [{ id: `pilot-${pilot.slug}`, name: pilot.name, role: membership.role, workspace: { id: 'pilot-workspace', name: 'Programa piloto' } }] : [];
+    const roles = membership?.roles || (membership ? [membership.role] : []);
+    return membership ? [{ id: `pilot-${pilot.slug}`, name: pilot.name, role: primaryRole(roles), roles, workspace: { id: 'pilot-workspace', name: 'Programa piloto' } }] : [];
   });
 }
 
