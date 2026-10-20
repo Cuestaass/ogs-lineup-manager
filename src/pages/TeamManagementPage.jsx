@@ -101,7 +101,7 @@ export default function TeamManagementPage() {
           </form>
           <div>
             {createdInvite && <div className="invite-result"><strong>Enlace creado</strong><input readOnly value={createdInvite.url}/><button type="button" className="secondary" onClick={() => navigator.clipboard.writeText(createdInvite.url)}>Copiar enlace</button>{createdInvite.emailDelivery === 'pending-external-provider' && <small>El correo queda pendiente hasta conectar el proveedor transaccional.</small>}</div>}
-            <div className="table-wrap"><table className="players-table"><thead><tr><th>Persona</th><th>Rol</th><th>Estado</th></tr></thead><tbody>{data.members.map(member => <tr key={member.user_id}><td>{member.display_name}<small>{member.email}</small></td><td>{member.role}</td><td>{member.status}</td></tr>)}</tbody></table></div>
+            <div className="table-wrap management-members-table"><table className="players-table"><thead><tr><th>Persona</th><th>Rol</th><th>Estado</th></tr></thead><tbody>{data.members.map(member => <tr key={member.user_id}><td data-label="Persona">{member.display_name}<small>{member.email}</small></td><td data-label="Rol">{member.role}</td><td data-label="Estado">{member.status}</td></tr>)}</tbody></table></div>
           </div>
         </div>
         <div className="invite-list">{data.invites.map(invite => <article key={invite.id}><div><strong>{invite.role} · {invite.mode}</strong><span>{invite.use_count}/{invite.max_uses} usos · caduca {new Date(invite.expires_at).toLocaleDateString('es-ES')}</span></div><button className="danger ghost" type="button" disabled={Boolean(invite.revoked_at)} onClick={() => revokeInvite(invite.id)}>{invite.revoked_at ? 'Revocada' : 'Revocar'}</button></article>)}</div>

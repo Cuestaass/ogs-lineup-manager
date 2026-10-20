@@ -12,3 +12,13 @@ body { margin: 0; background: radial-gradient(ellipse at 20% 0, #42644745, trans
 .login-form input:focus { outline: 3px solid #d7a82f40; border-color: var(--marker); }
 .login-links { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 18px; }
 .login-links button { padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: .82rem; text-decoration: underline; cursor: pointer; }
+
+@media (max-width: 520px) {
+  .login-page { place-items: stretch; padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); }
+  .login-card { align-self: center; padding: 28px 20px; }
+  .login-brand { align-items: flex-start; padding-bottom: 24px; margin-bottom: 28px; }
+  .login-brand img { width: 48px; height: 48px; }
+  .login-brand small { letter-spacing: .08em; }
+  .login-card h1 { font-size: clamp(2.35rem, 14vw, 3.4rem); overflow-wrap: anywhere; }
+  .login-links { display: grid; justify-items: start; }
+}

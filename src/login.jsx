@@ -77,7 +77,7 @@ function Login() {
     } finally { setBusy(false); }
   }
 
-  const title = mode === 'signup' ? 'Crea tu espacio de equipo' : mode === 'reset' ? 'Recupera tu acceso' : mode === 'update-password' ? 'Elige una contraseña nueva' : 'Entra en tu espacio de equipo';
+  const title = mode === 'signup' ? 'Crea tu cuenta' : mode === 'reset' ? 'Recupera tu acceso' : mode === 'update-password' ? 'Elige una contraseña nueva' : 'Entra en tu cuenta';
 
   return <main className="login-page">
     <section className="login-card" aria-labelledby="login-title">

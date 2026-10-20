@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { hasPermission, subscriptionAllows, validateInvite } from '../access.js';
+import { canAccessPage, hasPermission, subscriptionAllows, validateInvite } from '../access.js';
 
 test('aplica la jerarquía de permisos del equipo', () => {
   assert.equal(hasPermission('manager', 'billing.manage'), true);
@@ -10,6 +10,15 @@ test('aplica la jerarquía de permisos del equipo', () => {
   assert.equal(hasPermission('player', 'callups.respond'), true);
   assert.equal(hasPermission('player', 'roster.manage'), false);
   assert.equal(hasPermission('fan', 'callups.respond'), false);
+});
+
+test('la navegación sólo expone páginas permitidas por el rol', () => {
+  assert.equal(canAccessPage(undefined, 'equipo'), false);
+  assert.equal(canAccessPage(undefined, 'jdm'), true);
+  assert.equal(canAccessPage('player', 'equipo'), true);
+  assert.equal(canAccessPage('player', 'organizador'), false);
+  assert.equal(canAccessPage('delegate', 'organizador'), true);
+  assert.equal(canAccessPage('manager', 'tactica'), true);
 });
 
 test('las invitaciones individuales son de un uso y las colectivas sólo admiten jugadores', () => {
