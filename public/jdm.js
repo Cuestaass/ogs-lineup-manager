@@ -137,17 +137,11 @@ import { createCalendar, fixtureCount, googleCalendarUrl } from './calendar.js';
   retry.addEventListener('click', update);
   exportCalendar?.addEventListener('click', () => {
     const calendar = createCalendar(currentTeams);
-    const file = new File([calendar], 'partidos-cuaderno-de-campo.ics', { type: 'text/calendar;charset=utf-8' });
-    if (navigator.canShare?.({ files: [file] })) {
-      navigator.share({ files: [file], title: 'Calendario de partidos', text: 'Añadir partidos al calendario' }).catch(error => {
-        if (error.name !== 'AbortError') status.textContent = 'No se pudo compartir el calendario.';
-      });
-      return;
-    }
+    const file = new Blob([calendar], { type: 'text/calendar;charset=utf-8' });
     const url = URL.createObjectURL(file);
     const link = document.createElement('a');
     link.href = url;
-    link.download = file.name;
+    link.download = 'partidos-cuaderno-de-campo.ics';
     document.body.append(link);
     link.click();
     link.remove();
