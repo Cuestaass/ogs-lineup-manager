@@ -6,6 +6,12 @@ export const ROLE_PERMISSIONS = Object.freeze({
   player: ['callups.respond']
 });
 
+export const normalizeRoles = roles => [...new Set((Array.isArray(roles) ? roles : [roles]).filter(role => TEAM_ROLES.includes(role)))];
+
+export const primaryRole = roles => TEAM_ROLES.find(role => normalizeRoles(roles).includes(role)) || null;
+
+export const permissionsForRoles = roles => [...new Set(normalizeRoles(roles).flatMap(role => ROLE_PERMISSIONS[role]))];
+
 export const PAGE_PERMISSIONS = Object.freeze({
   equipo: null,
   organizador: 'lineups.manage',
@@ -13,13 +19,13 @@ export const PAGE_PERMISSIONS = Object.freeze({
   jdm: 'authenticated'
 });
 
-export const hasPermission = (role, permission) => Boolean(ROLE_PERMISSIONS[role]?.includes(permission));
+export const hasPermission = (roles, permission) => permissionsForRoles(roles).includes(permission);
 
-export function canAccessPage(role, page) {
+export function canAccessPage(roles, page) {
   const permission = PAGE_PERMISSIONS[page];
   if (permission === 'authenticated') return true;
-  if (permission == null) return TEAM_ROLES.includes(role);
-  return hasPermission(role, permission);
+  if (permission == null) return normalizeRoles(roles).length > 0;
+  return hasPermission(roles, permission);
 }
 
 export function validateInvite(input) {

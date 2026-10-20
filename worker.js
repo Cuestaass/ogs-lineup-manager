@@ -1,5 +1,5 @@
 import { fetchTeam, changes, searchTeams } from './jdm.js';
-import { ROLE_PERMISSIONS, hasPermission, subscriptionAllows, validateInvite } from './access.js';
+import { hasPermission, permissionsForRoles, primaryRole, subscriptionAllows, validateInvite } from './access.js';
 import { PILOT_TEAMS } from './pilots.js';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
@@ -62,14 +62,16 @@ async function ensureAccount(env, claims) {
 async function teamAccess(env, userId, teamId) {
   const member = await env.JDM_DB.prepare("SELECT tm.role,tm.status FROM team_members tm JOIN teams t ON t.id=tm.team_id LEFT JOIN team_subscriptions ts ON ts.team_id=t.id WHERE tm.team_id=? AND tm.user_id=? AND NOT (t.name='Mi equipo' AND t.external_team_slug IS NULL AND COALESCE(ts.plan,'free')='free' AND COALESCE(ts.status,'inactive')='inactive')").bind(teamId, userId).first();
   if (!member || member.status !== 'active') return null;
+  const roleRows = await env.JDM_DB.prepare('SELECT role FROM team_member_roles WHERE team_id=? AND user_id=?').bind(teamId, userId).all();
+  const roles = roleRows.results.length ? roleRows.results.map(row => row.role) : [member.role];
   const subscription = await env.JDM_DB.prepare('SELECT plan,status,current_period_end FROM team_subscriptions WHERE team_id=?').bind(teamId).first();
-  return { role: member.role, subscription: subscription || { plan: 'free', status: 'inactive' } };
+  return { role: primaryRole(roles), roles, subscription: subscription || { plan: 'free', status: 'inactive' } };
 }
 
 async function requirePermission(env, userId, teamId, permission) {
   const access = await teamAccess(env, userId, teamId);
   if (!access) throw new Response('', { status: 403 });
-  if (!hasPermission(access.role, permission)) throw new Response('', { status: 403 });
+  if (!hasPermission(access.roles, permission)) throw new Response('', { status: 403 });
   if (managementPermissions.has(permission) && !subscriptionAllows(access.subscription, 'team_management')) throw new Response(JSON.stringify({ error: 'La gestión de equipo requiere una suscripción activa.' }), { status: 402, headers: { 'content-type': 'application/json' } });
   return access;
 }
@@ -106,7 +108,7 @@ async function provisionPilots(request, env) {
     }
     let team = await env.JDM_DB.prepare('SELECT id,workspace_id FROM teams WHERE external_team_slug=? LIMIT 1').bind(pilot.slug).first();
     if (!team) {
-      team = await env.JDM_DB.prepare("SELECT t.id,t.workspace_id FROM teams t JOIN team_members tm ON tm.team_id=t.id LEFT JOIN team_subscriptions ts ON ts.team_id=t.id WHERE tm.user_id=? AND tm.role='manager' AND t.name='Mi equipo' AND t.external_team_slug IS NULL AND COALESCE(ts.plan,'free')='free' AND COALESCE(ts.status,'inactive')='inactive' ORDER BY t.created_at LIMIT 1").bind(user.id).first();
+      team = await env.JDM_DB.prepare("SELECT t.id,t.workspace_id FROM teams t JOIN team_members tm ON tm.team_id=t.id JOIN team_member_roles tmr ON tmr.team_id=tm.team_id AND tmr.user_id=tm.user_id LEFT JOIN team_subscriptions ts ON ts.team_id=t.id WHERE tm.user_id=? AND tmr.role='manager' AND t.name='Mi equipo' AND t.external_team_slug IS NULL AND COALESCE(ts.plan,'free')='free' AND COALESCE(ts.status,'inactive')='inactive' ORDER BY t.created_at LIMIT 1").bind(user.id).first();
     }
     if (!team) {
       const workspaceId = crypto.randomUUID();
@@ -123,6 +125,7 @@ async function provisionPilots(request, env) {
     await env.JDM_DB.batch([
       env.JDM_DB.prepare("INSERT INTO workspace_members(workspace_id,user_id,role) VALUES(?,?,'owner') ON CONFLICT(workspace_id,user_id) DO UPDATE SET role='owner'").bind(team.workspace_id, user.id),
       env.JDM_DB.prepare("INSERT INTO team_members(team_id,user_id,role,status) VALUES(?,?,'manager','active') ON CONFLICT(team_id,user_id) DO UPDATE SET role='manager',status='active'").bind(team.id, user.id),
+      env.JDM_DB.prepare("INSERT INTO team_member_roles(team_id,user_id,role) VALUES(?,?,'manager') ON CONFLICT(team_id,user_id,role) DO NOTHING").bind(team.id, user.id),
       env.JDM_DB.prepare("INSERT INTO team_subscriptions(team_id,plan,status,billing_owner_user_id,updated_at) VALUES(?,'pilot','active',?,CURRENT_TIMESTAMP) ON CONFLICT(team_id) DO UPDATE SET plan='pilot',status='active',billing_owner_user_id=excluded.billing_owner_user_id,updated_at=CURRENT_TIMESTAMP").bind(team.id, user.id)
     ]);
     results.push({ team: pilot.name, email, teamId: team.id, state: 'ready' });
@@ -150,9 +153,15 @@ async function authenticatedApi(request, env, ctx, url) {
   const claims = await authenticate(request, env);
   const account = await ensureAccount(env, claims);
   if (url.pathname === '/api/me' && request.method === 'GET') {
-    const teams = await env.JDM_DB.prepare("SELECT t.id,t.name,t.sport,t.workspace_id,w.name workspace_name,tm.role FROM teams t JOIN team_members tm ON tm.team_id=t.id JOIN workspaces w ON w.id=t.workspace_id LEFT JOIN team_subscriptions ts ON ts.team_id=t.id WHERE tm.user_id=? AND tm.status=? AND NOT (t.name='Mi equipo' AND t.external_team_slug IS NULL AND COALESCE(ts.plan,'free')='free' AND COALESCE(ts.status,'inactive')='inactive') ORDER BY t.created_at").bind(account.userId, 'active').all();
+    const teams = await env.JDM_DB.prepare("SELECT t.id,t.name,t.sport,t.workspace_id,w.name workspace_name,tm.role legacy_role FROM teams t JOIN team_members tm ON tm.team_id=t.id JOIN workspaces w ON w.id=t.workspace_id LEFT JOIN team_subscriptions ts ON ts.team_id=t.id WHERE tm.user_id=? AND tm.status=? AND NOT (t.name='Mi equipo' AND t.external_team_slug IS NULL AND COALESCE(ts.plan,'free')='free' AND COALESCE(ts.status,'inactive')='inactive') ORDER BY t.created_at").bind(account.userId, 'active').all();
+    const roleRows = await env.JDM_DB.prepare('SELECT team_id,role FROM team_member_roles WHERE user_id=?').bind(account.userId).all();
+    const rolesByTeam = new Map();
+    for (const row of roleRows.results) rolesByTeam.set(row.team_id, [...(rolesByTeam.get(row.team_id) || []), row.role]);
     const workspace = account.workspace || (teams.results[0] ? { id: teams.results[0].workspace_id, name: teams.results[0].workspace_name } : null);
-    return json({ user: { id: account.userId, name: claimName(claims), email: claims.email || null }, workspace, teams: teams.results.map(({ workspace_id, workspace_name, ...team }) => ({ ...team, workspace: { id: workspace_id, name: workspace_name } })) });
+    return json({ user: { id: account.userId, name: claimName(claims), email: claims.email || null }, workspace, teams: teams.results.map(({ workspace_id, workspace_name, legacy_role, ...team }) => {
+      const roles = rolesByTeam.get(team.id) || [legacy_role];
+      return { ...team, role: primaryRole(roles), roles, workspace: { id: workspace_id, name: workspace_name } };
+    }) });
   }
   const inviteAccept = url.pathname.match(/^\/api\/invites\/([^/]+)\/accept$/);
   if (inviteAccept && request.method === 'POST') {
@@ -160,24 +169,25 @@ async function authenticatedApi(request, env, ctx, url) {
     const invitation = await env.JDM_DB.prepare('SELECT * FROM team_invites WHERE token_hash=?').bind(tokenHash).first();
     if (!invitation || invitation.revoked_at || invitation.expires_at <= new Date().toISOString() || invitation.use_count >= invitation.max_uses) return json({ error: 'La invitación no existe, ha caducado o ya se ha utilizado.' }, 410);
     if (invitation.intended_email && invitation.intended_email !== String(claims.email || '').toLowerCase()) return json({ error: 'Esta invitación pertenece a otra dirección de correo.' }, 403);
-    const existing = await env.JDM_DB.prepare('SELECT role FROM team_members WHERE team_id=? AND user_id=?').bind(invitation.team_id, account.userId).first();
-    if (existing) return json({ error: 'Ya perteneces a este equipo.', role: existing.role }, 409);
+    const existingRole = await env.JDM_DB.prepare('SELECT 1 ok FROM team_member_roles WHERE team_id=? AND user_id=? AND role=?').bind(invitation.team_id, account.userId, invitation.role).first();
+    if (existingRole) return json({ error: 'Ya tienes este rol en el equipo.', role: invitation.role }, 409);
     const consumed = await env.JDM_DB.prepare('UPDATE team_invites SET use_count=use_count+1 WHERE id=? AND revoked_at IS NULL AND expires_at>? AND use_count<max_uses').bind(invitation.id, new Date().toISOString()).run();
     if (consumed.meta?.changes !== 1) return json({ error: 'La invitación ya no está disponible.' }, 410);
     const invitedTeam = await env.JDM_DB.prepare('SELECT workspace_id FROM teams WHERE id=?').bind(invitation.team_id).first();
     if (!invitedTeam) return json({ error: 'El equipo de la invitación ya no existe.' }, 410);
     await env.JDM_DB.batch([
       env.JDM_DB.prepare("INSERT INTO workspace_members(workspace_id,user_id,role) VALUES(?,?,'member') ON CONFLICT(workspace_id,user_id) DO NOTHING").bind(invitedTeam.workspace_id, account.userId),
-      env.JDM_DB.prepare('INSERT INTO team_members(team_id,user_id,role,status) VALUES(?,?,?,?)').bind(invitation.team_id, account.userId, invitation.role, 'active')
+      env.JDM_DB.prepare("INSERT INTO team_members(team_id,user_id,role,status) VALUES(?,?,?,'active') ON CONFLICT(team_id,user_id) DO UPDATE SET role=CASE WHEN team_members.role='manager' OR excluded.role='manager' THEN 'manager' WHEN team_members.role='delegate' OR excluded.role='delegate' THEN 'delegate' ELSE 'player' END,status='active'").bind(invitation.team_id, account.userId, invitation.role),
+      env.JDM_DB.prepare('INSERT INTO team_member_roles(team_id,user_id,role) VALUES(?,?,?)').bind(invitation.team_id, account.userId, invitation.role)
     ]);
     if (invitation.role === 'player') await env.JDM_DB.prepare('INSERT INTO roster_players(id,team_id,user_id,display_name) VALUES(?,?,?,?) ON CONFLICT(team_id,user_id) DO UPDATE SET status=?').bind(crypto.randomUUID(), invitation.team_id, account.userId, claimName(claims), 'active').run();
-    return json({ joined: true, teamId: invitation.team_id, role: invitation.role });
+    return json({ joined: true, teamId: invitation.team_id, addedRole: invitation.role });
   }
   const accessMatch = url.pathname.match(/^\/api\/teams\/([^/]+)\/access$/);
   if (accessMatch && request.method === 'GET') {
     const access = await teamAccess(env, account.userId, decodeURIComponent(accessMatch[1]));
     if (!access) return json({ error: 'No perteneces al equipo.' }, 403);
-    return json({ ...access, permissions: [...ROLE_PERMISSIONS[access.role]], teamManagementEnabled: subscriptionAllows(access.subscription, 'team_management') });
+    return json({ ...access, permissions: permissionsForRoles(access.roles), teamManagementEnabled: subscriptionAllows(access.subscription, 'team_management') });
   }
   const teamRoute = url.pathname.match(/^\/api\/teams\/([^/]+)\/(members|invites|roster|callups|matches|goals|source)$/);
   if (teamRoute) {
@@ -185,8 +195,14 @@ async function authenticatedApi(request, env, ctx, url) {
     const resource = teamRoute[2];
     if (resource === 'members' && request.method === 'GET') {
       await requirePermission(env, account.userId, teamId, 'members.manage');
-      const rows = await env.JDM_DB.prepare('SELECT tm.user_id,tm.role,tm.status,u.display_name,u.email FROM team_members tm JOIN users u ON u.id=tm.user_id WHERE tm.team_id=? ORDER BY tm.role,u.display_name').bind(teamId).all();
-      return json(rows.results);
+      const rows = await env.JDM_DB.prepare('SELECT tm.user_id,tm.role legacy_role,tm.status,u.display_name,u.email FROM team_members tm JOIN users u ON u.id=tm.user_id WHERE tm.team_id=? ORDER BY tm.role,u.display_name').bind(teamId).all();
+      const roleRows = await env.JDM_DB.prepare('SELECT user_id,role FROM team_member_roles WHERE team_id=?').bind(teamId).all();
+      const rolesByUser = new Map();
+      for (const row of roleRows.results) rolesByUser.set(row.user_id, [...(rolesByUser.get(row.user_id) || []), row.role]);
+      return json(rows.results.map(({ legacy_role, ...member }) => {
+        const roles = rolesByUser.get(member.user_id) || [legacy_role];
+        return { ...member, role: primaryRole(roles), roles };
+      }));
     }
     if (resource === 'invites' && request.method === 'GET') {
       await requirePermission(env, account.userId, teamId, 'members.invite');

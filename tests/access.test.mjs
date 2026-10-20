@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canAccessPage, hasPermission, subscriptionAllows, validateInvite } from '../access.js';
+import { canAccessPage, hasPermission, permissionsForRoles, primaryRole, subscriptionAllows, validateInvite } from '../access.js';
 
 test('aplica la jerarquía de permisos del equipo', () => {
   assert.equal(hasPermission('manager', 'billing.manage'), true);
@@ -10,6 +10,15 @@ test('aplica la jerarquía de permisos del equipo', () => {
   assert.equal(hasPermission('player', 'callups.respond'), true);
   assert.equal(hasPermission('player', 'roster.manage'), false);
   assert.equal(hasPermission('fan', 'callups.respond'), false);
+});
+
+test('combina permisos cuando una persona tiene varios roles en el mismo equipo', () => {
+  const roles = ['delegate', 'player'];
+  assert.equal(primaryRole(roles), 'delegate');
+  assert.equal(hasPermission(roles, 'roster.manage'), true);
+  assert.equal(hasPermission(roles, 'callups.respond'), true);
+  assert.equal(permissionsForRoles(roles).includes('billing.manage'), false);
+  assert.equal(canAccessPage(['manager', 'player'], 'organizador'), true);
 });
 
 test('la navegación sólo expone páginas permitidas por el rol', () => {

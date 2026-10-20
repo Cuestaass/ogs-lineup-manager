@@ -17,7 +17,7 @@ const Page = page === 'tactica' ? TacticsPage : page === 'jdm' ? MatchesPage : p
 
 function AuthorizedPage() {
   const { activeTeam } = useAuth();
-  if (canAccessPage(activeTeam?.role, page)) return <Page/>;
+  if (canAccessPage(activeTeam?.roles || activeTeam?.role, page)) return <Page/>;
   const hasTeam = Boolean(activeTeam);
   return <AppShell page={page}>
     <header className="app-header access-header"><div><p className="eyebrow">ACCESO PERSONAL</p><h1>{hasTeam ? 'Esta sección no corresponde a tu rol' : 'Aún no perteneces a un equipo'}</h1><p>{hasTeam ? 'Tu navegación muestra únicamente las herramientas habilitadas para ti.' : 'Tu cuenta está lista. Un mánager debe invitarte o asignarte a un equipo.'}</p></div></header>

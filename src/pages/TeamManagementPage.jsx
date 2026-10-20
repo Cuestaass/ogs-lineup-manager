@@ -81,13 +81,14 @@ export default function TeamManagementPage() {
     } catch (error) { setStatus(error.message); }
   }
   const access = data.access;
-  const manager = access?.role === 'manager';
-  const sportManager = ['manager', 'delegate'].includes(access?.role);
+  const roles = access?.roles || (access?.role ? [access.role] : []);
+  const manager = roles.includes('manager');
+  const sportManager = access?.permissions.some(permission => ['roster.manage', 'callups.manage'].includes(permission));
   return <AppShell page="equipo">
     <header className="app-header"><div><p className="eyebrow">GESTIÓN PRIVADA</p><h1>El equipo</h1><p>Miembros, plantilla y convocatorias de {activeTeam.name}.</p></div><div className="management-badge">{access?.subscription.plan || '—'} · {access?.subscription.status || '—'}</div></header>
     <main id="main-content" className="management-main">
       <p className="feedback management-status" role="status" aria-live="polite">{status}</p>
-      {access && <section className="management-summary" aria-label="Resumen de acceso"><div><span>Rol</span><strong>{access.role}</strong></div><div><span>Plan</span><strong>{access.subscription.plan}</strong></div><div><span>Gestión</span><strong>{access.teamManagementEnabled ? 'Activa' : 'Requiere suscripción'}</strong></div></section>}
+      {access && <section className="management-summary" aria-label="Resumen de acceso"><div><span>Roles</span><strong>{roles.join(' + ')}</strong></div><div><span>Plan</span><strong>{access.subscription.plan}</strong></div><div><span>Gestión</span><strong>{access.teamManagementEnabled ? 'Activa' : 'Requiere suscripción'}</strong></div></section>}
 
       {manager && <section className="panel management-section"><div className="section-heading"><div><p className="eyebrow">01 / ACCESO</p><h2>Miembros e invitaciones</h2><p>Los enlaces individuales se consumen una vez; los colectivos admiten varios jugadores.</p></div></div>
         <div className="management-columns">
@@ -101,7 +102,7 @@ export default function TeamManagementPage() {
           </form>
           <div>
             {createdInvite && <div className="invite-result"><strong>Enlace creado</strong><input readOnly value={createdInvite.url}/><button type="button" className="secondary" onClick={() => navigator.clipboard.writeText(createdInvite.url)}>Copiar enlace</button>{createdInvite.emailDelivery === 'pending-external-provider' && <small>El correo queda pendiente hasta conectar el proveedor transaccional.</small>}</div>}
-            <div className="table-wrap management-members-table"><table className="players-table"><thead><tr><th>Persona</th><th>Rol</th><th>Estado</th></tr></thead><tbody>{data.members.map(member => <tr key={member.user_id}><td data-label="Persona">{member.display_name}<small>{member.email}</small></td><td data-label="Rol">{member.role}</td><td data-label="Estado">{member.status}</td></tr>)}</tbody></table></div>
+            <div className="table-wrap management-members-table"><table className="players-table"><thead><tr><th>Persona</th><th>Roles</th><th>Estado</th></tr></thead><tbody>{data.members.map(member => <tr key={member.user_id}><td data-label="Persona">{member.display_name}<small>{member.email}</small></td><td data-label="Roles">{(member.roles || [member.role]).join(' + ')}</td><td data-label="Estado">{member.status}</td></tr>)}</tbody></table></div>
           </div>
         </div>
         <div className="invite-list">{data.invites.map(invite => <article key={invite.id}><div><strong>{invite.role} · {invite.mode}</strong><span>{invite.use_count}/{invite.max_uses} usos · caduca {new Date(invite.expires_at).toLocaleDateString('es-ES')}</span></div><button className="danger ghost" type="button" disabled={Boolean(invite.revoked_at)} onClick={() => revokeInvite(invite.id)}>{invite.revoked_at ? 'Revocada' : 'Revocar'}</button></article>)}</div>
@@ -122,7 +123,7 @@ export default function TeamManagementPage() {
         {data.goals.length > 0 && <div className="goal-list">{data.goals.map(goal => <article key={goal.id}><strong>{goal.player_name}</strong><span>{goal.minute == null ? 'Minuto no indicado' : `Minuto ${goal.minute}`}</span><small>{goal.match_id}</small></article>)}</div>}
       </section>}
 
-      {access?.role === 'player' && <section className="panel management-section player-callups"><div className="section-heading"><div><p className="eyebrow">01 / CONVOCATORIAS</p><h2>Confirma tu asistencia</h2><p>Tu respuesta queda vinculada a tu ficha de jugador.</p></div></div>
+      {roles.includes('player') && <section className="panel management-section player-callups"><div className="section-heading"><div><p className="eyebrow">05 / MIS CONVOCATORIAS</p><h2>Confirma tu asistencia</h2><p>Tu respuesta queda vinculada a tu ficha de jugador.</p></div></div>
         <div className="callup-list">{data.callups.length ? data.callups.map(callup => <article key={callup.id}><div><strong>{callup.title}</strong><span>{new Date(callup.starts_at).toLocaleString('es-ES')}</span>{callup.response_deadline && <small>Responde antes del {new Date(callup.response_deadline).toLocaleString('es-ES')}</small>}</div><div className="callup-response"><span>Respuesta: <b>{callup.my_response || 'pendiente'}</b></span><button type="button" className={callup.my_response === 'available' ? 'primary' : ''} onClick={() => respondToCallup(callup.id, 'available')}>Disponible</button><button type="button" className={callup.my_response === 'unavailable' ? 'danger' : ''} onClick={() => respondToCallup(callup.id, 'unavailable')}>No disponible</button></div></article>) : <p className="management-empty">No tienes convocatorias pendientes.</p>}</div>
       </section>}
     </main>
