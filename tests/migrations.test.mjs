@@ -13,3 +13,23 @@ test('las migraciones crean el modelo de equipos, permisos y actividad', () => {
   }
   database.close();
 });
+
+test('un usuario puede tener un rol distinto en cada equipo independiente', () => {
+  const database = new DatabaseSync(':memory:');
+  database.exec(readFileSync(new URL('../migrations/0001_jdm.sql', import.meta.url), 'utf8'));
+  database.exec(readFileSync(new URL('../migrations/0002_accounts_and_teams.sql', import.meta.url), 'utf8'));
+  database.exec(`
+    INSERT INTO users(id,email,display_name) VALUES('user-1','multirol@example.com','Usuario multirol');
+    INSERT INTO workspaces(id,name) VALUES('workspace-a','Club A'),('workspace-b','Club B');
+    INSERT INTO teams(id,workspace_id,name) VALUES('team-a','workspace-a','Equipo A'),('team-b','workspace-b','Equipo B');
+    INSERT INTO team_members(team_id,user_id,role,status) VALUES
+      ('team-a','user-1','manager','active'),
+      ('team-b','user-1','player','active');
+  `);
+  const roles = database.prepare('SELECT team_id,role FROM team_members WHERE user_id=? ORDER BY team_id').all('user-1').map(row => ({ ...row }));
+  assert.deepEqual(roles, [
+    { team_id: 'team-a', role: 'manager' },
+    { team_id: 'team-b', role: 'player' }
+  ]);
+  database.close();
+});
