@@ -57,6 +57,55 @@ export const defaultState = () => ({
     players: []
   });
 
+const normalizeName = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+export function syncRosterPlayers(state, roster, teamId = state.teams[0]?.id) {
+  if (!teamId) return state;
+  const sourceIds = new Set(roster.map(player => String(player.id)));
+  const staleIds = new Set(state.players.filter(player => player.origin === 'roster' && !sourceIds.has(String(player.sourceId))).map(player => player.id));
+  state.players = state.players.filter(player => !staleIds.has(player.id));
+  for (const team of state.teams) {
+    team.lineup = team.lineup.map(id => staleIds.has(id) ? null : id);
+    team.naturalSubs = team.naturalSubs.filter(pair => !staleIds.has(pair.starterId) && !staleIds.has(pair.substituteId));
+  }
+  for (const source of roster) {
+    const sourceId = String(source.id);
+    let player = state.players.find(item => item.origin === 'roster' && String(item.sourceId) === sourceId);
+    if (!player) {
+      const legacyMatches = state.players.filter(item => item.origin !== 'roster' && normalizeName(item.name) === normalizeName(source.display_name));
+      player = legacyMatches.length === 1 ? legacyMatches[0] : null;
+    }
+    if (!player) {
+      player = { id: state.nextPlayerId++, name: source.display_name, number: source.number || null, teamIds: [teamId] };
+      state.players.push(player);
+    }
+    player.origin = 'roster';
+    player.sourceId = sourceId;
+    player.name = source.display_name;
+    player.number = source.number || player.number || null;
+    if (!player.teamIds.includes(teamId)) player.teamIds.push(teamId);
+  }
+  return state;
+}
+
+export function applyCallupToTeam(state, teamId, callup = null) {
+  const team = state.teams.find(item => item.id === Number(teamId));
+  if (!team) return state;
+  team.callupId = callup?.id || null;
+  team.callupRosterIds = callup ? (callup.players || []).map(player => String(player.id)) : null;
+  const eligibleIds = new Set(eligibleTeamPlayers(state, team.id).map(player => player.id));
+  team.lineup = team.lineup.map(id => eligibleIds.has(id) ? id : null);
+  team.naturalSubs = team.naturalSubs.filter(pair => eligibleIds.has(pair.starterId) && eligibleIds.has(pair.substituteId));
+  return state;
+}
+
+export function eligibleTeamPlayers(state, teamId) {
+  const id = Number(teamId);
+  const team = state.teams.find(item => item.id === id);
+  const selectedRoster = Array.isArray(team?.callupRosterIds) ? new Set(team.callupRosterIds.map(String)) : null;
+  return state.players.filter(player => player.teamIds.includes(id) && (!selectedRoster || player.origin !== 'roster' || selectedRoster.has(String(player.sourceId))));
+}
+
 export function loadState() {
     try {
       let serialized = localStorage.getItem(storageKey());
@@ -75,9 +124,15 @@ export function loadState() {
         team.lineup = [...team.lineup.slice(0, 7), ...Array(7).fill(null)].slice(0, 7);
         if (!formations[team.formation]) team.formation = '321';
         if (!Array.isArray(team.naturalSubs)) team.naturalSubs = [];
+        team.callupId ||= null;
+        if (!Array.isArray(team.callupRosterIds)) team.callupRosterIds = null;
         team.naturalSubs = team.naturalSubs
           .filter(pair => pair && Number.isFinite(Number(pair.starterId)) && Number.isFinite(Number(pair.substituteId)))
           .map(pair => ({ starterId: Number(pair.starterId), substituteId: Number(pair.substituteId) }));
+      });
+      parsed.players.forEach(player => {
+        player.origin ||= 'temporary';
+        if (player.sourceId != null) player.sourceId = String(player.sourceId);
       });
       return parsed;
     } catch {

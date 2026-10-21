@@ -59,6 +59,55 @@ const defaultState = () => ({
     players: []
   });
 
+const normalizeName = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+function syncRosterPlayers(state, roster, teamId = state.teams[0]?.id) {
+  if (!teamId) return state;
+  const sourceIds = new Set(roster.map(player => String(player.id)));
+  const staleIds = new Set(state.players.filter(player => player.origin === 'roster' && !sourceIds.has(String(player.sourceId))).map(player => player.id));
+  state.players = state.players.filter(player => !staleIds.has(player.id));
+  for (const team of state.teams) {
+    team.lineup = team.lineup.map(id => staleIds.has(id) ? null : id);
+    team.naturalSubs = team.naturalSubs.filter(pair => !staleIds.has(pair.starterId) && !staleIds.has(pair.substituteId));
+  }
+  for (const source of roster) {
+    const sourceId = String(source.id);
+    let player = state.players.find(item => item.origin === 'roster' && String(item.sourceId) === sourceId);
+    if (!player) {
+      const legacyMatches = state.players.filter(item => item.origin !== 'roster' && normalizeName(item.name) === normalizeName(source.display_name));
+      player = legacyMatches.length === 1 ? legacyMatches[0] : null;
+    }
+    if (!player) {
+      player = { id: state.nextPlayerId++, name: source.display_name, number: source.number || null, teamIds: [teamId] };
+      state.players.push(player);
+    }
+    player.origin = 'roster';
+    player.sourceId = sourceId;
+    player.name = source.display_name;
+    player.number = source.number || player.number || null;
+    if (!player.teamIds.includes(teamId)) player.teamIds.push(teamId);
+  }
+  return state;
+}
+
+function applyCallupToTeam(state, teamId, callup = null) {
+  const team = state.teams.find(item => item.id === Number(teamId));
+  if (!team) return state;
+  team.callupId = callup?.id || null;
+  team.callupRosterIds = callup ? (callup.players || []).map(player => String(player.id)) : null;
+  const eligibleIds = new Set(eligibleTeamPlayers(state, team.id).map(player => player.id));
+  team.lineup = team.lineup.map(id => eligibleIds.has(id) ? id : null);
+  team.naturalSubs = team.naturalSubs.filter(pair => eligibleIds.has(pair.starterId) && eligibleIds.has(pair.substituteId));
+  return state;
+}
+
+function eligibleTeamPlayers(state, teamId) {
+  const id = Number(teamId);
+  const team = state.teams.find(item => item.id === id);
+  const selectedRoster = Array.isArray(team?.callupRosterIds) ? new Set(team.callupRosterIds.map(String)) : null;
+  return state.players.filter(player => player.teamIds.includes(id) && (!selectedRoster || player.origin !== 'roster' || selectedRoster.has(String(player.sourceId))));
+}
+
 function loadState() {
     try {
       let serialized = localStorage.getItem(storageKey());
@@ -77,9 +126,15 @@ function loadState() {
         team.lineup = [...team.lineup.slice(0, 7), ...Array(7).fill(null)].slice(0, 7);
         if (!formations[team.formation]) team.formation = '321';
         if (!Array.isArray(team.naturalSubs)) team.naturalSubs = [];
+        team.callupId ||= null;
+        if (!Array.isArray(team.callupRosterIds)) team.callupRosterIds = null;
         team.naturalSubs = team.naturalSubs
           .filter(pair => pair && Number.isFinite(Number(pair.starterId)) && Number.isFinite(Number(pair.substituteId)))
           .map(pair => ({ starterId: Number(pair.starterId), substituteId: Number(pair.substituteId) }));
+      });
+      parsed.players.forEach(player => {
+        player.origin ||= 'temporary';
+        if (player.sourceId != null) player.sourceId = String(player.sourceId);
       });
       return parsed;
     } catch {
@@ -178,6 +233,7 @@ const persistState = saveState;
   let state = loadState();
   let selected = null;
   let dragged = null;
+  let lineupOptions = { roster: [], callups: [] };
 
   const dom = {
     newTeamName: document.getElementById('new-team-name'),
@@ -220,7 +276,7 @@ const persistState = saveState;
   }
 
   function teamMembers(teamId) {
-    return state.players.filter(player => player.teamIds.includes(Number(teamId)));
+    return eligibleTeamPlayers(state, teamId);
   }
 
   function teamBench(team) {
@@ -305,7 +361,7 @@ const persistState = saveState;
     const number = Number.isInteger(requested) && requested > 0 ? requested : getNextAutoNumber();
     const teamIds = [...dom.newPlayerTeams.querySelectorAll('input[type="checkbox"]:checked')].map(input => Number(input.value));
 
-    state.players.push({ id: state.nextPlayerId++, name, number, teamIds });
+    state.players.push({ id: state.nextPlayerId++, name, number, teamIds, origin: 'temporary' });
     dom.newPlayerName.value = '';
     dom.newPlayerNumber.value = '';
     saveState();
@@ -351,7 +407,7 @@ const persistState = saveState;
         if (samePlayer) {
           if (!samePlayer.teamIds.includes(destinationTeam.id)) samePlayer.teamIds.push(destinationTeam.id);
         } else {
-          state.players.push({ id: state.nextPlayerId++, name, number: getNextAutoNumber(), teamIds: [destinationTeam.id] });
+          state.players.push({ id: state.nextPlayerId++, name, number: getNextAutoNumber(), teamIds: [destinationTeam.id], origin: 'temporary' });
         }
       });
       selected = null;
@@ -480,6 +536,7 @@ const persistState = saveState;
 
     state.players.forEach(player => {
       const row = document.createElement('tr');
+      const fromRoster = player.origin === 'roster';
 
       const numberCell = document.createElement('td');
       const numberInput = document.createElement('input');
@@ -488,6 +545,7 @@ const persistState = saveState;
       numberInput.max = '999';
       numberInput.className = 'number-input';
       numberInput.value = player.number;
+      numberInput.disabled = fromRoster;
       numberInput.setAttribute('aria-label', `Dorsal de ${player.name}`);
       numberInput.addEventListener('change', () => {
         const value = Number(numberInput.value);
@@ -504,6 +562,7 @@ const persistState = saveState;
       nameInput.maxLength = 80;
       nameInput.className = 'name-input';
       nameInput.value = player.name;
+      nameInput.disabled = fromRoster;
       nameInput.setAttribute('aria-label', `Nombre de ${player.name}`);
       nameInput.addEventListener('change', () => {
         const value = nameInput.value.trim();
@@ -517,6 +576,9 @@ const persistState = saveState;
         render();
       });
       nameCell.appendChild(nameInput);
+      const source = document.createElement('small');
+      source.textContent = fromRoster ? 'Plantilla del equipo' : 'Refuerzo temporal de esta pizarra';
+      nameCell.appendChild(source);
 
       const teamsCell = document.createElement('td');
       const checks = document.createElement('div');
@@ -527,6 +589,7 @@ const persistState = saveState;
         const input = document.createElement('input');
         input.type = 'checkbox';
         input.checked = player.teamIds.includes(team.id);
+        input.disabled = fromRoster;
         input.addEventListener('change', () => updatePlayerMembership(player.id, team.id, input.checked));
         label.append(input, document.createTextNode(team.name));
         checks.appendChild(label);
@@ -535,9 +598,10 @@ const persistState = saveState;
 
       const actionCell = document.createElement('td');
       const remove = document.createElement('button');
-      remove.className = 'danger ghost';
-      remove.textContent = 'Eliminar';
-      remove.addEventListener('click', () => removePlayer(player.id));
+      remove.className = fromRoster ? 'ghost' : 'danger ghost';
+      remove.textContent = fromRoster ? 'Gestionar en Mi equipo' : 'Eliminar';
+      remove.disabled = fromRoster;
+      if (!fromRoster) remove.addEventListener('click', () => removePlayer(player.id));
       actionCell.appendChild(remove);
 
       row.append(numberCell, nameCell, teamsCell, actionCell);
@@ -725,6 +789,27 @@ const persistState = saveState;
       card.querySelector('.lineup-meter').setAttribute('aria-label', `${starters} de 7 titulares en campo`);
       card.querySelector('.lineup-meter').classList.toggle('is-complete', starters === 7);
       card.querySelector('.team-meta').textContent = `${members.length} jugadores · ${starters} titulares · ${bench.length} suplentes`;
+
+      const callupSelect = card.querySelector('.lineup-callup-select');
+      const callupButton = card.querySelector('.lineup-callup-apply');
+      for (const callup of lineupOptions.callups) {
+        const option = document.createElement('option');
+        option.value = callup.id;
+        option.textContent = `${new Date(callup.starts_at).toLocaleDateString('es-ES')} · ${callup.title} · ${callup.players.length}`;
+        callupSelect.appendChild(option);
+      }
+      callupSelect.value = team.callupId || '';
+      callupButton.disabled = !lineupOptions.roster.length;
+      callupButton.addEventListener('click', () => {
+        const callup = lineupOptions.callups.find(item => item.id === callupSelect.value) || null;
+        applyCallupToTeam(state, team.id, callup);
+        selected = null;
+        saveState();
+        render();
+        setFeedback(callup ? `${team.name}: ${callup.players.length} convocados disponibles para alinear.` : `${team.name}: plantilla completa disponible.`);
+      });
+      const activeCallup = lineupOptions.callups.find(item => item.id === team.callupId);
+      card.querySelector('.lineup-source-label').textContent = activeCallup ? `Alineables: ${activeCallup.title} + refuerzos temporales` : 'Alineables: toda la plantilla + refuerzos temporales';
 
       const formationSelect = card.querySelector('.formation-select');
       formationSelect.value = team.formation;
@@ -1116,15 +1201,38 @@ const persistState = saveState;
   dom.exportAllPng.addEventListener('click', () => exportTeamsPng(state.teams));
   dom.exportAllPdf.addEventListener('click', () => exportTeamsPdf(state.teams));
   dom.clearAll.addEventListener('click', () => {
-    if (!confirm('¿Borrar todos los equipos y jugadores?')) return;
+    if (!confirm('¿Reiniciar las alineaciones y borrar los refuerzos temporales? La plantilla oficial del equipo se conservará.')) return;
     state = defaultState();
+    syncRosterPlayers(state, lineupOptions.roster || [], state.teams[0]?.id);
     selected = null;
     saveState();
     render();
-    setFeedback('Se han borrado todos los datos.');
+    setFeedback('Pizarra reiniciada. La plantilla oficial se ha conservado.');
   });
 
   render();
+  async function loadLineupOptions() {
+    const teamId = globalThis.__OGS_TEAM__?.id;
+    if (!teamId || !globalThis.__OGS_API__) return;
+    try {
+      const response = await globalThis.__OGS_API__(`/api/teams/${encodeURIComponent(teamId)}/lineup-options`);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'No se pudo cargar la plantilla del equipo.');
+      lineupOptions = body;
+      const primaryTeam = state.teams[0];
+      syncRosterPlayers(state, body.roster || [], primaryTeam?.id);
+      for (const team of state.teams) {
+        if (!team.callupId) continue;
+        const callup = body.callups?.find(item => item.id === team.callupId) || null;
+        applyCallupToTeam(state, team.id, callup);
+      }
+      saveState();
+      render();
+    } catch (error) {
+      setFeedback(`${error.message} Puedes seguir usando los jugadores temporales guardados en este navegador.`);
+    }
+  }
+  loadLineupOptions();
 })();
 
 })();

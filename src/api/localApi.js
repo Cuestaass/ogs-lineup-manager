@@ -87,7 +87,7 @@ export async function localApi(path, options = {}) {
     write(teamId, state);
     return json({ removed: true });
   }
-  const team = url.pathname.match(/^\/api\/teams\/([^/]+)\/(access|members|invites|roster|callups|matches|goals)$/);
+  const team = url.pathname.match(/^\/api\/teams\/([^/]+)\/(access|members|invites|roster|callups|lineup-options|matches|goals)$/);
   if (team) {
     const teamId = decodeURIComponent(team[1]);
     const resource = team[2];
@@ -96,6 +96,10 @@ export async function localApi(path, options = {}) {
     const roles = membership?.roles || [membership?.role || 'manager'];
     const role = primaryRole(roles);
     if (resource === 'access') return json({ role, roles, subscription: { plan: 'pilot', status: 'active' }, permissions: permissionsForRoles(roles), teamManagementEnabled: true });
+    if (resource === 'lineup-options') return json({
+      roster: state.roster.filter(player => player.status === 'active'),
+      callups: state.callups.filter(callup => !callup.cancelled_at).map(callup => ({ ...callup, players: (callup.player_ids || []).map(id => state.roster.find(player => player.id === id)).filter(Boolean) }))
+    });
     if (options.method === 'POST') {
       const body = JSON.parse(options.body || '{}');
       if (resource === 'invites') {

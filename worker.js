@@ -218,7 +218,7 @@ async function authenticatedApi(request, env, ctx, url) {
     if (!access) return json({ error: 'No perteneces al equipo.' }, 403);
     return json({ ...access, permissions: permissionsForRoles(access.roles), teamManagementEnabled: subscriptionAllows(access.subscription, 'team_management') });
   }
-  const teamRoute = url.pathname.match(/^\/api\/teams\/([^/]+)\/(members|invites|roster|callups|matches|goals|source)$/);
+  const teamRoute = url.pathname.match(/^\/api\/teams\/([^/]+)\/(members|invites|roster|callups|lineup-options|matches|goals|source)$/);
   if (teamRoute) {
     const teamId = decodeURIComponent(teamRoute[1]);
     const resource = teamRoute[2];
@@ -261,6 +261,15 @@ async function authenticatedApi(request, env, ctx, url) {
       const player = { id: crypto.randomUUID(), name: String(body.displayName).trim(), number: body.number == null ? null : Number(body.number) };
       await env.JDM_DB.prepare('INSERT INTO roster_players(id,team_id,display_name,number) VALUES(?,?,?,?)').bind(player.id, teamId, player.name, player.number).run();
       return json(player, 201);
+    }
+    if (resource === 'lineup-options' && request.method === 'GET') {
+      await requirePermission(env, account.userId, teamId, 'lineups.manage');
+      const roster = await env.JDM_DB.prepare("SELECT id,user_id,display_name,number,status FROM roster_players WHERE team_id=? AND status='active' ORDER BY number,display_name").bind(teamId).all();
+      const callups = await env.JDM_DB.prepare('SELECT id,match_id,title,starts_at,response_deadline FROM callups WHERE team_id=? AND cancelled_at IS NULL AND starts_at>=? ORDER BY starts_at').bind(teamId, new Date(Date.now() - 86400000).toISOString()).all();
+      const callupPlayers = callups.results.length ? await env.JDM_DB.prepare(`SELECT cp.callup_id,rp.id,rp.user_id,rp.display_name,rp.number FROM callup_players cp JOIN roster_players rp ON rp.id=cp.roster_player_id WHERE cp.callup_id IN (${callups.results.map(() => '?').join(',')}) AND rp.status='active' ORDER BY rp.number,rp.display_name`).bind(...callups.results.map(callup => callup.id)).all() : { results: [] };
+      const playersByCallup = new Map();
+      for (const player of callupPlayers.results) playersByCallup.set(player.callup_id, [...(playersByCallup.get(player.callup_id) || []), { id: player.id, user_id: player.user_id, display_name: player.display_name, number: player.number }]);
+      return json({ roster: roster.results, callups: callups.results.map(callup => ({ ...callup, players: playersByCallup.get(callup.id) || [] })) });
     }
     if (resource === 'callups' && request.method === 'GET') {
       const access = await teamAccess(env, account.userId, teamId);

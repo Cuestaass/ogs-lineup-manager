@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { loadState, saveState } from '../public/organizador/model.js';
+import { applyCallupToTeam, defaultState, eligibleTeamPlayers, loadState, saveState, syncRosterPlayers } from '../public/organizador/model.js';
 
 test('conserva equipos existentes y normaliza sus cambios naturales', () => {
   const records = new Map();
@@ -43,4 +43,21 @@ test('migra y guarda cada equipo en un espacio aislado', () => {
   assert.equal(JSON.parse(records.get('ogs-organizer-v2:local-2')).teams[0].name, 'Equipo B');
   delete globalThis.__OGS_TEAM__;
   delete globalThis.localStorage;
+});
+
+test('combina la plantilla persistente con refuerzos temporales y filtra por convocatoria', () => {
+  const state = defaultState();
+  syncRosterPlayers(state, [
+    { id: 'roster-1', display_name: 'Convocado', number: 7 },
+    { id: 'roster-2', display_name: 'No convocado', number: 8 }
+  ]);
+  state.players.push({ id: state.nextPlayerId++, name: 'Refuerzo', number: 9, teamIds: [1], origin: 'temporary' });
+  state.teams[0].lineup = [state.players.find(player => player.sourceId === 'roster-2').id, null, null, null, null, null, null];
+
+  applyCallupToTeam(state, 1, { id: 'callup-1', players: [{ id: 'roster-1' }] });
+  assert.deepEqual(eligibleTeamPlayers(state, 1).map(player => player.name), ['Convocado', 'Refuerzo']);
+  assert.equal(state.teams[0].lineup[0], null);
+
+  syncRosterPlayers(state, [{ id: 'roster-1', display_name: 'Convocado actualizado', number: 10 }]);
+  assert.deepEqual(state.players.map(player => player.name), ['Convocado actualizado', 'Refuerzo']);
 });

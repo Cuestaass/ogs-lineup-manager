@@ -44,7 +44,7 @@
     <section class="panel team-creator" id="altas" aria-labelledby="altas-title">
       <div>
         <p class="eyebrow">02 / ALTAS E IMPORTACIÓN</p><h2 id="altas-title">Amplía tu equipo</h2>
-        <p>Crea un equipo o incorpora jugadores a los que ya tienes.</p>
+        <p>Añade refuerzos puntuales a esta pizarra sin modificar la plantilla oficial del equipo.</p>
       </div>
       <div class="inline-form">
         <label>
@@ -57,8 +57,8 @@
 
     <section class="panel player-creator">
       <div>
-        <h2>Nuevo jugador</h2>
-        <p>El dorsal se asigna automáticamente cuando se deja vacío.</p>
+        <h2>Refuerzo temporal</h2>
+        <p>Estará disponible en esta alineación, pero no se añadirá de forma persistente a “Mi equipo”. El dorsal se asigna automáticamente cuando se deja vacío.</p>
       </div>
       <div class="player-form-grid">
         <label>
@@ -101,9 +101,9 @@
       <div class="section-heading">
         <div>
           <p class="eyebrow">03 / PLANTILLA</p><h2 id="plantilla-title">Todos los jugadores</h2>
-          <p>Edita el nombre o el dorsal, asigna un jugador a varios equipos o elimínalo.</p>
+          <p>La plantilla del equipo se sincroniza automáticamente. Aquí también aparecen los refuerzos temporales de esta pizarra.</p>
         </div>
-        <button id="clear-all" class="danger ghost">Borrar todos los datos</button>
+        <button id="clear-all" class="danger ghost">Reiniciar pizarra local</button>
       </div>
       <div class="table-wrap">
         <table class="players-table">
@@ -121,7 +121,7 @@
       <div id="players-empty" class="empty-state">Todavía no hay jugadores. <a href="#altas">Añade el primero o importa la ficha del equipo.</a></div>
     </section>
 
-    <p class="storage-notice"><strong>Guardado en este navegador.</strong> Los datos no se sincronizan y se pierden si borras los datos del sitio. PNG y PDF conservan una copia visual de la alineación.</p>
+      <p class="storage-notice"><strong>Alineaciones guardadas en este navegador.</strong> La plantilla se obtiene de “Mi equipo”; los refuerzos temporales y la colocación no modifican esa plantilla. PNG y PDF conservan una copia visual.</p>
   </main>
 
   <template id="team-template">
@@ -152,6 +152,12 @@
         <button class="export-png secondary">Exportar PNG</button>
         <button class="export-pdf secondary">Exportar PDF</button>
         <button class="delete-team danger ghost">Eliminar equipo</button>
+      </div>
+
+      <div class="lineup-callup-controls">
+        <label><span>Jugadores alineables</span><select class="lineup-callup-select"><option value="">Toda la plantilla</option></select></label>
+        <button type="button" class="lineup-callup-apply secondary">Usar selección</button>
+        <small class="lineup-source-label">Alineables: toda la plantilla + refuerzos temporales</small>
       </div>
 
       <div class="pitch-export-area">

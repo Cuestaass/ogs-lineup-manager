@@ -1,10 +1,11 @@
-import { formations, defaultState, loadState, saveState as persistState } from './organizador/model.js';
+import { applyCallupToTeam, eligibleTeamPlayers, formations, defaultState, loadState, saveState as persistState, syncRosterPlayers } from './organizador/model.js';
 import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organizador/pdf-import.js';
 
 (() => {
   let state = loadState();
   let selected = null;
   let dragged = null;
+  let lineupOptions = { roster: [], callups: [] };
 
   const dom = {
     newTeamName: document.getElementById('new-team-name'),
@@ -47,7 +48,7 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
   }
 
   function teamMembers(teamId) {
-    return state.players.filter(player => player.teamIds.includes(Number(teamId)));
+    return eligibleTeamPlayers(state, teamId);
   }
 
   function teamBench(team) {
@@ -132,7 +133,7 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
     const number = Number.isInteger(requested) && requested > 0 ? requested : getNextAutoNumber();
     const teamIds = [...dom.newPlayerTeams.querySelectorAll('input[type="checkbox"]:checked')].map(input => Number(input.value));
 
-    state.players.push({ id: state.nextPlayerId++, name, number, teamIds });
+    state.players.push({ id: state.nextPlayerId++, name, number, teamIds, origin: 'temporary' });
     dom.newPlayerName.value = '';
     dom.newPlayerNumber.value = '';
     saveState();
@@ -178,7 +179,7 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
         if (samePlayer) {
           if (!samePlayer.teamIds.includes(destinationTeam.id)) samePlayer.teamIds.push(destinationTeam.id);
         } else {
-          state.players.push({ id: state.nextPlayerId++, name, number: getNextAutoNumber(), teamIds: [destinationTeam.id] });
+          state.players.push({ id: state.nextPlayerId++, name, number: getNextAutoNumber(), teamIds: [destinationTeam.id], origin: 'temporary' });
         }
       });
       selected = null;
@@ -307,6 +308,7 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
 
     state.players.forEach(player => {
       const row = document.createElement('tr');
+      const fromRoster = player.origin === 'roster';
 
       const numberCell = document.createElement('td');
       const numberInput = document.createElement('input');
@@ -315,6 +317,7 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
       numberInput.max = '999';
       numberInput.className = 'number-input';
       numberInput.value = player.number;
+      numberInput.disabled = fromRoster;
       numberInput.setAttribute('aria-label', `Dorsal de ${player.name}`);
       numberInput.addEventListener('change', () => {
         const value = Number(numberInput.value);
@@ -331,6 +334,7 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
       nameInput.maxLength = 80;
       nameInput.className = 'name-input';
       nameInput.value = player.name;
+      nameInput.disabled = fromRoster;
       nameInput.setAttribute('aria-label', `Nombre de ${player.name}`);
       nameInput.addEventListener('change', () => {
         const value = nameInput.value.trim();
@@ -344,6 +348,9 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
         render();
       });
       nameCell.appendChild(nameInput);
+      const source = document.createElement('small');
+      source.textContent = fromRoster ? 'Plantilla del equipo' : 'Refuerzo temporal de esta pizarra';
+      nameCell.appendChild(source);
 
       const teamsCell = document.createElement('td');
       const checks = document.createElement('div');
@@ -354,6 +361,7 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
         const input = document.createElement('input');
         input.type = 'checkbox';
         input.checked = player.teamIds.includes(team.id);
+        input.disabled = fromRoster;
         input.addEventListener('change', () => updatePlayerMembership(player.id, team.id, input.checked));
         label.append(input, document.createTextNode(team.name));
         checks.appendChild(label);
@@ -362,9 +370,10 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
 
       const actionCell = document.createElement('td');
       const remove = document.createElement('button');
-      remove.className = 'danger ghost';
-      remove.textContent = 'Eliminar';
-      remove.addEventListener('click', () => removePlayer(player.id));
+      remove.className = fromRoster ? 'ghost' : 'danger ghost';
+      remove.textContent = fromRoster ? 'Gestionar en Mi equipo' : 'Eliminar';
+      remove.disabled = fromRoster;
+      if (!fromRoster) remove.addEventListener('click', () => removePlayer(player.id));
       actionCell.appendChild(remove);
 
       row.append(numberCell, nameCell, teamsCell, actionCell);
@@ -552,6 +561,27 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
       card.querySelector('.lineup-meter').setAttribute('aria-label', `${starters} de 7 titulares en campo`);
       card.querySelector('.lineup-meter').classList.toggle('is-complete', starters === 7);
       card.querySelector('.team-meta').textContent = `${members.length} jugadores · ${starters} titulares · ${bench.length} suplentes`;
+
+      const callupSelect = card.querySelector('.lineup-callup-select');
+      const callupButton = card.querySelector('.lineup-callup-apply');
+      for (const callup of lineupOptions.callups) {
+        const option = document.createElement('option');
+        option.value = callup.id;
+        option.textContent = `${new Date(callup.starts_at).toLocaleDateString('es-ES')} · ${callup.title} · ${callup.players.length}`;
+        callupSelect.appendChild(option);
+      }
+      callupSelect.value = team.callupId || '';
+      callupButton.disabled = !lineupOptions.roster.length;
+      callupButton.addEventListener('click', () => {
+        const callup = lineupOptions.callups.find(item => item.id === callupSelect.value) || null;
+        applyCallupToTeam(state, team.id, callup);
+        selected = null;
+        saveState();
+        render();
+        setFeedback(callup ? `${team.name}: ${callup.players.length} convocados disponibles para alinear.` : `${team.name}: plantilla completa disponible.`);
+      });
+      const activeCallup = lineupOptions.callups.find(item => item.id === team.callupId);
+      card.querySelector('.lineup-source-label').textContent = activeCallup ? `Alineables: ${activeCallup.title} + refuerzos temporales` : 'Alineables: toda la plantilla + refuerzos temporales';
 
       const formationSelect = card.querySelector('.formation-select');
       formationSelect.value = team.formation;
@@ -943,13 +973,36 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
   dom.exportAllPng.addEventListener('click', () => exportTeamsPng(state.teams));
   dom.exportAllPdf.addEventListener('click', () => exportTeamsPdf(state.teams));
   dom.clearAll.addEventListener('click', () => {
-    if (!confirm('¿Borrar todos los equipos y jugadores?')) return;
+    if (!confirm('¿Reiniciar las alineaciones y borrar los refuerzos temporales? La plantilla oficial del equipo se conservará.')) return;
     state = defaultState();
+    syncRosterPlayers(state, lineupOptions.roster || [], state.teams[0]?.id);
     selected = null;
     saveState();
     render();
-    setFeedback('Se han borrado todos los datos.');
+    setFeedback('Pizarra reiniciada. La plantilla oficial se ha conservado.');
   });
 
   render();
+  async function loadLineupOptions() {
+    const teamId = globalThis.__OGS_TEAM__?.id;
+    if (!teamId || !globalThis.__OGS_API__) return;
+    try {
+      const response = await globalThis.__OGS_API__(`/api/teams/${encodeURIComponent(teamId)}/lineup-options`);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || 'No se pudo cargar la plantilla del equipo.');
+      lineupOptions = body;
+      const primaryTeam = state.teams[0];
+      syncRosterPlayers(state, body.roster || [], primaryTeam?.id);
+      for (const team of state.teams) {
+        if (!team.callupId) continue;
+        const callup = body.callups?.find(item => item.id === team.callupId) || null;
+        applyCallupToTeam(state, team.id, callup);
+      }
+      saveState();
+      render();
+    } catch (error) {
+      setFeedback(`${error.message} Puedes seguir usando los jugadores temporales guardados en este navegador.`);
+    }
+  }
+  loadLineupOptions();
 })();
