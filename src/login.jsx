@@ -9,12 +9,13 @@ import {
   signUp,
   updatePassword
 } from './auth/supabase.js';
+import { registrationReturnTo, safeReturnTo as sanitizeReturnTo } from './auth/returnTo.js';
 import '../public/styles.css';
 import './login.css';
 
 const safeReturnTo = () => {
   const value = new URLSearchParams(location.search).get('returnTo');
-  return value?.startsWith('/') && !value.startsWith('//') ? value : '/organizador/';
+  return sanitizeReturnTo(value);
 };
 
 const initialMode = () => {
@@ -61,8 +62,9 @@ function Login() {
         await signIn(String(form.get('email')), String(form.get('password')));
         location.replace(safeReturnTo());
       } else if (mode === 'signup') {
-        const result = await signUp(String(form.get('email')), String(form.get('password')), String(form.get('name')));
-        if (result.session) location.replace(safeReturnTo());
+        const returnTo = registrationReturnTo(safeReturnTo());
+        const result = await signUp(String(form.get('email')), String(form.get('password')), String(form.get('name')), returnTo);
+        if (result.session) location.replace(returnTo);
         else setStatus('Revisa tu correo para confirmar la cuenta.');
       } else if (mode === 'reset') {
         await requestPasswordReset(String(form.get('email')));

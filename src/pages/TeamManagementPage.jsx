@@ -11,7 +11,7 @@ const readJson = async response => {
 
 export default function TeamManagementPage() {
   const { activeTeam } = useAuth();
-  const [data, setData] = useState({ access: null, members: [], invites: [], roster: [], callups: [], matches: [], goals: [] });
+  const [data, setData] = useState({ access: null, members: [], invites: [], roster: [], linkCandidates: [], callups: [], matches: [], goals: [] });
   const [status, setStatus] = useState('Cargando el equipo…');
   const [createdInvite, setCreatedInvite] = useState(null);
   const [selectedPlayers, setSelectedPlayers] = useState([]);
@@ -24,14 +24,15 @@ export default function TeamManagementPage() {
       const canManageMembers = access.permissions.includes('members.manage');
       const canManageRoster = access.permissions.includes('roster.manage');
       const canRecordGoals = access.permissions.includes('goals.record');
-      const [members, invites, roster, callups, matchData] = await Promise.all([
+      const [members, invites, roster, linkCandidates, callups, matchData] = await Promise.all([
         canManageMembers ? api(`${base}/members`).then(readJson) : [],
         access.permissions.includes('members.invite') ? api(`${base}/invites`).then(readJson) : [],
         canManageRoster ? api(`${base}/roster`).then(readJson) : [],
+        canManageRoster ? api(`${base}/roster/candidates`).then(readJson) : [],
         api(`${base}/callups`).then(readJson),
         canRecordGoals ? api(`${base}/matches`).then(readJson) : { matches: [], goals: [] }
       ]);
-      setData({ access, members, invites, roster, callups, ...matchData });
+      setData({ access, members, invites, roster, linkCandidates, callups, ...matchData });
       setStatus('');
     } catch (error) { setStatus(error.message); }
   }, [base]);
@@ -50,6 +51,27 @@ export default function TeamManagementPage() {
   async function revokeInvite(id) {
     setStatus('Revocando invitación…');
     try { await readJson(await api(`${base}/invites/${encodeURIComponent(id)}`, { method: 'DELETE' })); await load(); } catch (error) { setStatus(error.message); }
+  }
+  async function removeRole(member, role) {
+    if (!confirm(`¿Quitar el rol de ${role} a ${member.display_name}?`)) return;
+    setStatus('Actualizando permisos…');
+    try { await readJson(await api(`${base}/members/${encodeURIComponent(member.user_id)}/roles/${encodeURIComponent(role)}`, { method: 'DELETE' })); await load(); } catch (error) { setStatus(error.message); }
+  }
+  async function removeMember(member) {
+    if (!confirm(`¿Eliminar el acceso de ${member.display_name} a este equipo? Su ficha deportiva se conservará sin vincular.`)) return;
+    setStatus('Eliminando acceso…');
+    try { await readJson(await api(`${base}/members/${encodeURIComponent(member.user_id)}`, { method: 'DELETE' })); await load(); } catch (error) { setStatus(error.message); }
+  }
+  async function linkPlayer(event, playerId) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const userId = String(form.get('userId') || '');
+    if (!userId) return;
+    setStatus('Vinculando jugador y cuenta…');
+    try {
+      await readJson(await api(`${base}/roster/${encodeURIComponent(playerId)}/link`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId }) }));
+      await load();
+    } catch (error) { setStatus(error.message); }
   }
   async function submitPlayer(event) {
     event.preventDefault(); const formElement = event.currentTarget; const form = new FormData(formElement);
@@ -102,7 +124,7 @@ export default function TeamManagementPage() {
           </form>
           <div>
             {createdInvite && <div className="invite-result"><strong>Enlace creado</strong><input readOnly value={createdInvite.url}/><button type="button" className="secondary" onClick={() => navigator.clipboard.writeText(createdInvite.url)}>Copiar enlace</button>{createdInvite.emailDelivery === 'pending-external-provider' && <small>El correo queda pendiente hasta conectar el proveedor transaccional.</small>}</div>}
-            <div className="table-wrap management-members-table"><table className="players-table"><thead><tr><th>Persona</th><th>Roles</th><th>Estado</th></tr></thead><tbody>{data.members.map(member => <tr key={member.user_id}><td data-label="Persona">{member.display_name}<small>{member.email}</small></td><td data-label="Roles">{(member.roles || [member.role]).join(' + ')}</td><td data-label="Estado">{member.status}</td></tr>)}</tbody></table></div>
+            <div className="table-wrap management-members-table"><table className="players-table"><thead><tr><th>Persona</th><th>Roles y permisos</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{data.members.map(member => <tr key={member.user_id}><td data-label="Persona">{member.display_name}<small>{member.email}</small></td><td data-label="Roles"><div className="member-role-list">{(member.roles || [member.role]).map(role => <span key={role}>{role}<button type="button" className="ghost member-role-remove" onClick={() => removeRole(member, role)} aria-label={`Quitar rol ${role} a ${member.display_name}`}>×</button></span>)}</div></td><td data-label="Estado">{member.status}</td><td data-label="Acciones"><button type="button" className="danger ghost member-access-remove" onClick={() => removeMember(member)}>Quitar acceso</button></td></tr>)}</tbody></table></div>
           </div>
         </div>
         <div className="invite-list">{data.invites.map(invite => <article key={invite.id}><div><strong>{invite.role} · {invite.mode}</strong><span>{invite.use_count}/{invite.max_uses} usos · caduca {new Date(invite.expires_at).toLocaleDateString('es-ES')}</span></div><button className="danger ghost" type="button" disabled={Boolean(invite.revoked_at)} onClick={() => revokeInvite(invite.id)}>{invite.revoked_at ? 'Revocada' : 'Revocar'}</button></article>)}</div>
@@ -110,7 +132,7 @@ export default function TeamManagementPage() {
 
       {sportManager && <section className="panel management-section"><div className="section-heading"><div><p className="eyebrow">02 / PLANTILLA</p><h2>Jugadores</h2><p>Las cuentas invitadas como jugador se vinculan automáticamente; también puedes preparar fichas antes del registro.</p></div></div>
         <form className="management-form compact" onSubmit={submitPlayer}><label><span>Nombre</span><input name="displayName" required maxLength="80"/></label><label><span>Dorsal</span><input name="number" type="number" min="1" max="999"/></label><button className="primary" type="submit">Añadir jugador</button></form>
-        <div className="roster-cards">{data.roster.map(player => <article key={player.id}><strong>{player.number || '—'}</strong><span>{player.display_name}</span><small>{player.user_id ? 'Cuenta vinculada' : 'Pendiente de vincular'}</small></article>)}</div>
+        <div className="roster-cards">{data.roster.map(player => <article key={player.id} className={player.user_id ? '' : 'roster-card-pending'}><strong>{player.number || '—'}</strong><span>{player.display_name}</span><small>{player.user_id ? 'Cuenta vinculada' : 'Pendiente de vincular'}</small>{!player.user_id && <form className="roster-link-form" onSubmit={event => linkPlayer(event, player.id)}><label><span className="sr-only">Cuenta para {player.display_name}</span><select name="userId" required defaultValue=""><option value="" disabled>Selecciona una cuenta</option>{data.linkCandidates.map(candidate => <option key={candidate.user_id} value={candidate.user_id}>{candidate.display_name} · {candidate.roles.join(' + ')}{candidate.linked_player_name ? ` · vinculada a ${candidate.linked_player_name}` : ''}</option>)}</select></label><button type="submit" className="secondary" disabled={!data.linkCandidates.length}>Vincular</button></form>}</article>)}</div>
       </section>}
 
       {sportManager && <section className="panel management-section"><div className="section-heading"><div><p className="eyebrow">03 / CONVOCATORIAS</p><h2>Disponibilidad</h2><p>Convoca a la plantilla y consulta las respuestas.</p></div></div>

@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { AppShell } from './AppShell.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { hasPermission } from '../../access.js';
+import { api } from '../auth/supabase.js';
 
 function filterMarkup(markup, roles) {
   const template = document.createElement('template');
@@ -17,7 +18,9 @@ export function LegacyPage({ page, markup, loadController }) {
   const [ready, setReady] = useState(false);
   useLayoutEffect(() => {
     window.__OGS_TEAM__ = activeTeam;
+    window.__OGS_API__ = api;
     setReady(true);
+    return () => { delete window.__OGS_API__; };
   }, [activeTeam]);
   useEffect(() => {
     if (ready) loadController();

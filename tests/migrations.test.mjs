@@ -83,3 +83,35 @@ test('vincular una fuente oficial permite suscribir automáticamente a todos los
   );
   database.close();
 });
+
+test('fusionar una cuenta con una ficha manual conserva convocatorias y goles', () => {
+  const database = new DatabaseSync(':memory:');
+  for (const migration of ['0001_jdm.sql', '0002_accounts_and_teams.sql', '0003_team_member_roles.sql', '0004_team_competition_follows.sql']) {
+    database.exec(readFileSync(new URL(`../migrations/${migration}`, import.meta.url), 'utf8'));
+  }
+  database.exec(`
+    INSERT INTO users(id,email,display_name) VALUES('manager','manager@example.com','Mánager'),('player','player@example.com','Jugador');
+    INSERT INTO workspaces(id,name) VALUES('workspace','Club');
+    INSERT INTO workspace_members(workspace_id,user_id,role) VALUES('workspace','manager','owner'),('workspace','player','member');
+    INSERT INTO teams(id,workspace_id,name) VALUES('team','workspace','Equipo');
+    INSERT INTO team_members(team_id,user_id,role,status) VALUES('team','manager','manager','active'),('team','player','player','active');
+    INSERT INTO team_member_roles(team_id,user_id,role) VALUES('team','manager','manager'),('team','player','player');
+    INSERT INTO roster_players(id,team_id,user_id,display_name,number) VALUES
+      ('manual','team',NULL,'Jugador deportivo',7),
+      ('automatic','team','player','Nombre de la cuenta',NULL);
+    INSERT INTO callups(id,team_id,title,starts_at,created_by) VALUES('callup','team','Partido','2026-10-25T10:00:00Z','manager');
+    INSERT INTO callup_players(callup_id,roster_player_id,response) VALUES('callup','manual','pending'),('callup','automatic','available');
+    INSERT INTO match_goals(id,team_id,match_id,roster_player_id,created_by) VALUES('goal','team','match','automatic','manager');
+  `);
+  database.exec(`
+    DELETE FROM callup_players WHERE roster_player_id='manual' AND callup_id IN (SELECT callup_id FROM callup_players WHERE roster_player_id='automatic');
+    UPDATE callup_players SET roster_player_id='manual' WHERE roster_player_id='automatic';
+    UPDATE match_goals SET roster_player_id='manual' WHERE roster_player_id='automatic';
+    DELETE FROM roster_players WHERE id='automatic';
+    UPDATE roster_players SET user_id='player',status='active' WHERE id='manual' AND team_id='team';
+  `);
+  assert.deepEqual({ ...database.prepare('SELECT id,user_id,display_name,number FROM roster_players').get() }, { id: 'manual', user_id: 'player', display_name: 'Jugador deportivo', number: 7 });
+  assert.deepEqual({ ...database.prepare('SELECT roster_player_id,response FROM callup_players').get() }, { roster_player_id: 'manual', response: 'available' });
+  assert.equal(database.prepare('SELECT roster_player_id FROM match_goals WHERE id=?').get('goal').roster_player_id, 'manual');
+  database.close();
+});

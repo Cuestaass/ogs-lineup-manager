@@ -90,6 +90,11 @@ h3 { font-size: 1rem; }
 .export-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
 .export-actions button { font-size: .77rem; }
 .export-actions .delete-team { margin-left: auto; }
+.lineup-callup-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 7px; margin: 12px 0 18px; padding: 12px; border: 1px solid var(--border); background: #213d32; }
+.lineup-callup-controls label { min-width: 0; }
+.lineup-callup-controls select { min-width: 0; width: 100%; }
+.lineup-callup-controls button { min-height: 44px; padding-inline: 10px; }
+.lineup-source-label { grid-column: 1 / -1; color: var(--muted); font-size: .68rem; }
 .pitch-export-area { min-width: 0; }
 .pitch {
   position: relative;
@@ -387,7 +392,7 @@ h3 { font-size: 1rem; }
 #alineaciones .teams-heading { margin: 0 0 20px; }
 #alineaciones h2 { font-size: 2.5rem; }
 #alineaciones .team-card { border-top: 1px solid var(--border); padding-top: 22px; }
-#alineaciones .team-controls button.secondary, #alineaciones .export-actions button.secondary { border-color: #78917c; }
+#alineaciones .team-controls button.secondary, #alineaciones .export-actions button.secondary, #alineaciones .lineup-callup-controls button.secondary { border-color: #78917c; }
 #alineaciones .danger { color: #f5af99; }
 #alineaciones .danger:hover { color: #8a291d; }
 #alineaciones :where(button, input, select, [tabindex]):focus-visible { outline-color: var(--marker); }
@@ -420,10 +425,12 @@ h3 { font-size: 1rem; }
   #alineaciones .team-title-block { min-width: 0; }
   #alineaciones .team-controls { display: grid; grid-template-columns: 1fr; margin-top: 30px; gap: 10px; }
   #alineaciones .team-controls label { width: 100%; }
-  #alineaciones .export-actions { grid-column: 1; grid-row: 2; display: grid; margin: 24px 0 0; padding-top: 20px; border-top: 1px solid var(--border); }
+  #alineaciones .lineup-callup-controls { grid-column: 1; grid-row: 2; grid-template-columns: 1fr; margin: 24px 0 0; padding: 14px 0; border-inline: 0; background: transparent; }
+  #alineaciones .lineup-callup-controls button, #alineaciones .lineup-source-label { grid-column: 1; }
+  #alineaciones .export-actions { grid-column: 1; grid-row: 3; display: grid; margin: 0; padding-top: 20px; border-top: 1px solid var(--border); }
   #alineaciones .export-actions .delete-team { margin: 0; white-space: normal; }
-  #alineaciones .pitch-export-area { grid-column: 2; grid-row: 1 / 3; }
-  #alineaciones .team-notes { grid-column: 3; grid-row: 1 / 3; margin: 0; }
+  #alineaciones .pitch-export-area { grid-column: 2; grid-row: 1 / 4; }
+  #alineaciones .team-notes { grid-column: 3; grid-row: 1 / 4; margin: 0; }
   #alineaciones .lineup-meter { display: block; margin-top: 22px; }
   #alineaciones .lineup-total { display: block; font-size: 4.2rem; }
   #alineaciones .lineup-caption { display: block; max-width: none; margin-top: 7px; text-transform: uppercase; letter-spacing: .08em; }
@@ -434,6 +441,8 @@ h3 { font-size: 1rem; }
   #alineaciones h2 { font-size: 2.1rem; }
   .lineup-meter { margin-top: 10px; }
   .lineup-total { font-size: 2.2rem; }
+  .lineup-callup-controls { grid-template-columns: 1fr; }
+  .lineup-callup-controls button, .lineup-source-label { grid-column: 1; }
 }
 #alineaciones .natural-pitch-sub-label { background: transparent; color: var(--marker); }
 #alineaciones .natural-sub-chip-label { background: var(--marker); color: var(--ink); }

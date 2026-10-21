@@ -20,7 +20,74 @@ function write(teamId, value) { localStorage.setItem(key(teamId), JSON.stringify
 
 export async function localApi(path, options = {}) {
   const url = new URL(path, location.origin);
-  const team = url.pathname.match(/^\/api\/teams\/([^/]+)\/(access|members|invites|roster|callups|matches|goals)$/);
+  const rosterCandidates = url.pathname.match(/^\/api\/teams\/([^/]+)\/roster\/candidates$/);
+  if (rosterCandidates && (!options.method || options.method === 'GET')) {
+    const state = read(decodeURIComponent(rosterCandidates[1]));
+    return json(state.members.filter(member => member.status === 'active').map(member => {
+      const linked = state.roster.find(player => player.user_id === member.user_id);
+      return { user_id: member.user_id, display_name: member.display_name, email: member.email, roles: member.roles || [member.role], linked_roster_id: linked?.id || null, linked_player_name: linked?.display_name || null };
+    }));
+  }
+  const rosterLink = url.pathname.match(/^\/api\/teams\/([^/]+)\/roster\/([^/]+)\/link$/);
+  if (rosterLink && options.method === 'PATCH') {
+    const teamId = decodeURIComponent(rosterLink[1]);
+    const state = read(teamId);
+    const player = state.roster.find(item => item.id === decodeURIComponent(rosterLink[2]));
+    const userId = String(JSON.parse(options.body || '{}').userId || '');
+    const member = state.members.find(item => item.user_id === userId && item.status === 'active');
+    if (!player) return json({ error: 'La ficha de jugador no existe.' }, 404);
+    if (player.user_id) return json({ error: 'Esta ficha ya está vinculada a una cuenta.' }, 409);
+    if (!member) return json({ error: 'La cuenta no pertenece a este equipo.' }, 400);
+    const duplicate = state.roster.find(item => item.user_id === userId);
+    if (duplicate) {
+      for (const callup of state.callups) {
+        callup.player_ids = [...new Set((callup.player_ids || []).map(id => id === duplicate.id ? player.id : id))];
+        if (callup.responses?.[duplicate.id]) {
+          callup.responses[player.id] = callup.responses[duplicate.id];
+          delete callup.responses[duplicate.id];
+        }
+      }
+      for (const goal of state.goals) if (goal.roster_player_id === duplicate.id) { goal.roster_player_id = player.id; goal.player_name = player.display_name; }
+      state.roster = state.roster.filter(item => item.id !== duplicate.id);
+    }
+    player.user_id = userId;
+    player.status = 'active';
+    member.roles = [...new Set([...(member.roles || [member.role]), 'player'])];
+    member.role = primaryRole(member.roles);
+    write(teamId, state);
+    return json({ linked: true, mergedRosterId: duplicate?.id || null });
+  }
+  const memberRole = url.pathname.match(/^\/api\/teams\/([^/]+)\/members\/([^/]+)\/roles\/([^/]+)$/);
+  if (memberRole && options.method === 'DELETE') {
+    const teamId = decodeURIComponent(memberRole[1]);
+    const userId = decodeURIComponent(memberRole[2]);
+    const role = decodeURIComponent(memberRole[3]);
+    const state = read(teamId);
+    const member = state.members.find(item => item.user_id === userId);
+    const roles = member?.roles || (member ? [member.role] : []);
+    if (!member || !roles.includes(role)) return json({ error: 'La persona no tiene ese rol.' }, 404);
+    if (role === 'manager' && state.members.filter(item => item.status === 'active' && (item.roles || [item.role]).includes('manager')).length <= 1) return json({ error: 'El equipo debe conservar al menos un mánager.' }, 409);
+    member.roles = roles.filter(item => item !== role);
+    if (role === 'player') for (const player of state.roster) if (player.user_id === userId) player.user_id = null;
+    if (!member.roles.length) state.members = state.members.filter(item => item.user_id !== userId);
+    else member.role = primaryRole(member.roles);
+    write(teamId, state);
+    return json({ removed: true, accessRemoved: !member.roles.length, roles: member.roles });
+  }
+  const memberAccess = url.pathname.match(/^\/api\/teams\/([^/]+)\/members\/([^/]+)$/);
+  if (memberAccess && options.method === 'DELETE') {
+    const teamId = decodeURIComponent(memberAccess[1]);
+    const userId = decodeURIComponent(memberAccess[2]);
+    const state = read(teamId);
+    const member = state.members.find(item => item.user_id === userId);
+    if (!member) return json({ error: 'La persona no pertenece al equipo.' }, 404);
+    if ((member.roles || [member.role]).includes('manager') && state.members.filter(item => item.status === 'active' && (item.roles || [item.role]).includes('manager')).length <= 1) return json({ error: 'El equipo debe conservar al menos un mánager.' }, 409);
+    for (const player of state.roster) if (player.user_id === userId) player.user_id = null;
+    state.members = state.members.filter(item => item.user_id !== userId);
+    write(teamId, state);
+    return json({ removed: true });
+  }
+  const team = url.pathname.match(/^\/api\/teams\/([^/]+)\/(access|members|invites|roster|callups|lineup-options|matches|goals)$/);
   if (team) {
     const teamId = decodeURIComponent(team[1]);
     const resource = team[2];
@@ -29,6 +96,10 @@ export async function localApi(path, options = {}) {
     const roles = membership?.roles || [membership?.role || 'manager'];
     const role = primaryRole(roles);
     if (resource === 'access') return json({ role, roles, subscription: { plan: 'pilot', status: 'active' }, permissions: permissionsForRoles(roles), teamManagementEnabled: true });
+    if (resource === 'lineup-options') return json({
+      roster: state.roster.filter(player => player.status === 'active'),
+      callups: state.callups.filter(callup => !callup.cancelled_at).map(callup => ({ ...callup, players: (callup.player_ids || []).map(id => state.roster.find(player => player.id === id)).filter(Boolean) }))
+    });
     if (options.method === 'POST') {
       const body = JSON.parse(options.body || '{}');
       if (resource === 'invites') {

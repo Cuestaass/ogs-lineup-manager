@@ -93,6 +93,20 @@ async function subscribeAllTeamMembers(env, teamId) {
   await env.JDM_DB.prepare("INSERT OR IGNORE INTO user_follows(user_id,slug,name,team_code,group_code) SELECT tm.user_id,t.external_team_slug,t.name,t.external_team_code,t.external_group_code FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE t.id=? AND tm.status='active' AND t.external_team_slug IS NOT NULL AND t.external_team_code IS NOT NULL AND t.external_group_code IS NOT NULL").bind(teamId).run();
 }
 
+async function isLastActiveManager(env, teamId, userId) {
+  const target = await env.JDM_DB.prepare("SELECT 1 ok FROM team_member_roles r JOIN team_members tm ON tm.team_id=r.team_id AND tm.user_id=r.user_id WHERE r.team_id=? AND r.user_id=? AND r.role='manager' AND tm.status='active'").bind(teamId, userId).first();
+  if (!target) return false;
+  const managers = await env.JDM_DB.prepare("SELECT COUNT(*) total FROM team_member_roles r JOIN team_members tm ON tm.team_id=r.team_id AND tm.user_id=r.user_id WHERE r.team_id=? AND r.role='manager' AND tm.status='active'").bind(teamId).first();
+  return Number(managers?.total || 0) <= 1;
+}
+
+async function cleanupWorkspaceMembership(env, teamId, userId) {
+  const team = await env.JDM_DB.prepare('SELECT workspace_id FROM teams WHERE id=?').bind(teamId).first();
+  if (!team) return;
+  const anotherTeam = await env.JDM_DB.prepare("SELECT 1 ok FROM team_members tm JOIN teams t ON t.id=tm.team_id WHERE t.workspace_id=? AND tm.user_id=? AND tm.status='active' LIMIT 1").bind(team.workspace_id, userId).first();
+  if (!anotherTeam) await env.JDM_DB.prepare('DELETE FROM workspace_members WHERE workspace_id=? AND user_id=?').bind(team.workspace_id, userId).run();
+}
+
 async function inspectInvite(env, token) {
   const invitation = await env.JDM_DB.prepare('SELECT i.id,i.role,i.mode,i.max_uses,i.use_count,i.expires_at,i.revoked_at,t.name team_name FROM team_invites i JOIN teams t ON t.id=i.team_id WHERE i.token_hash=?').bind(await hashToken(token)).first();
   if (!invitation) return null;
@@ -204,7 +218,7 @@ async function authenticatedApi(request, env, ctx, url) {
     if (!access) return json({ error: 'No perteneces al equipo.' }, 403);
     return json({ ...access, permissions: permissionsForRoles(access.roles), teamManagementEnabled: subscriptionAllows(access.subscription, 'team_management') });
   }
-  const teamRoute = url.pathname.match(/^\/api\/teams\/([^/]+)\/(members|invites|roster|callups|matches|goals|source)$/);
+  const teamRoute = url.pathname.match(/^\/api\/teams\/([^/]+)\/(members|invites|roster|callups|lineup-options|matches|goals|source)$/);
   if (teamRoute) {
     const teamId = decodeURIComponent(teamRoute[1]);
     const resource = teamRoute[2];
@@ -247,6 +261,15 @@ async function authenticatedApi(request, env, ctx, url) {
       const player = { id: crypto.randomUUID(), name: String(body.displayName).trim(), number: body.number == null ? null : Number(body.number) };
       await env.JDM_DB.prepare('INSERT INTO roster_players(id,team_id,display_name,number) VALUES(?,?,?,?)').bind(player.id, teamId, player.name, player.number).run();
       return json(player, 201);
+    }
+    if (resource === 'lineup-options' && request.method === 'GET') {
+      await requirePermission(env, account.userId, teamId, 'lineups.manage');
+      const roster = await env.JDM_DB.prepare("SELECT id,user_id,display_name,number,status FROM roster_players WHERE team_id=? AND status='active' ORDER BY number,display_name").bind(teamId).all();
+      const callups = await env.JDM_DB.prepare('SELECT id,match_id,title,starts_at,response_deadline FROM callups WHERE team_id=? AND cancelled_at IS NULL AND starts_at>=? ORDER BY starts_at').bind(teamId, new Date(Date.now() - 86400000).toISOString()).all();
+      const callupPlayers = callups.results.length ? await env.JDM_DB.prepare(`SELECT cp.callup_id,rp.id,rp.user_id,rp.display_name,rp.number FROM callup_players cp JOIN roster_players rp ON rp.id=cp.roster_player_id WHERE cp.callup_id IN (${callups.results.map(() => '?').join(',')}) AND rp.status='active' ORDER BY rp.number,rp.display_name`).bind(...callups.results.map(callup => callup.id)).all() : { results: [] };
+      const playersByCallup = new Map();
+      for (const player of callupPlayers.results) playersByCallup.set(player.callup_id, [...(playersByCallup.get(player.callup_id) || []), { id: player.id, user_id: player.user_id, display_name: player.display_name, number: player.number }]);
+      return json({ roster: roster.results, callups: callups.results.map(callup => ({ ...callup, players: playersByCallup.get(callup.id) || [] })) });
     }
     if (resource === 'callups' && request.method === 'GET') {
       const access = await teamAccess(env, account.userId, teamId);
@@ -293,6 +316,78 @@ async function authenticatedApi(request, env, ctx, url) {
       await env.JDM_DB.prepare('INSERT INTO match_goals(id,team_id,match_id,roster_player_id,minute,created_by) VALUES(?,?,?,?,?,?)').bind(id, teamId, body.matchId, player.id, body.minute == null ? null : Number(body.minute), account.userId).run();
       return json({ id }, 201);
     }
+  }
+  const rosterCandidates = url.pathname.match(/^\/api\/teams\/([^/]+)\/roster\/candidates$/);
+  if (rosterCandidates && request.method === 'GET') {
+    const teamId = decodeURIComponent(rosterCandidates[1]);
+    await requirePermission(env, account.userId, teamId, 'roster.manage');
+    const rows = await env.JDM_DB.prepare("SELECT tm.user_id,u.display_name,u.email,GROUP_CONCAT(r.role) roles,rp.id linked_roster_id,rp.display_name linked_player_name FROM team_members tm JOIN users u ON u.id=tm.user_id LEFT JOIN team_member_roles r ON r.team_id=tm.team_id AND r.user_id=tm.user_id LEFT JOIN roster_players rp ON rp.team_id=tm.team_id AND rp.user_id=tm.user_id WHERE tm.team_id=? AND tm.status='active' GROUP BY tm.user_id,u.display_name,u.email,rp.id,rp.display_name ORDER BY u.display_name").bind(teamId).all();
+    return json(rows.results.map(row => ({ ...row, roles: String(row.roles || '').split(',').filter(Boolean) })));
+  }
+  const rosterLink = url.pathname.match(/^\/api\/teams\/([^/]+)\/roster\/([^/]+)\/link$/);
+  if (rosterLink && request.method === 'PATCH') {
+    const teamId = decodeURIComponent(rosterLink[1]);
+    const playerId = decodeURIComponent(rosterLink[2]);
+    await requirePermission(env, account.userId, teamId, 'roster.manage');
+    const body = await request.json();
+    const userId = String(body.userId || '');
+    const player = await env.JDM_DB.prepare('SELECT id,user_id FROM roster_players WHERE id=? AND team_id=?').bind(playerId, teamId).first();
+    if (!player) return json({ error: 'La ficha de jugador no existe.' }, 404);
+    if (player.user_id) return json({ error: 'Esta ficha ya está vinculada a una cuenta.' }, 409);
+    const member = await env.JDM_DB.prepare("SELECT 1 ok FROM team_members WHERE team_id=? AND user_id=? AND status='active'").bind(teamId, userId).first();
+    if (!member) return json({ error: 'La cuenta no pertenece a este equipo.' }, 400);
+    const duplicate = await env.JDM_DB.prepare('SELECT id FROM roster_players WHERE team_id=? AND user_id=?').bind(teamId, userId).first();
+    const statements = [];
+    if (duplicate && duplicate.id !== playerId) statements.push(
+      env.JDM_DB.prepare('DELETE FROM callup_players WHERE roster_player_id=? AND callup_id IN (SELECT callup_id FROM callup_players WHERE roster_player_id=?)').bind(playerId, duplicate.id),
+      env.JDM_DB.prepare('UPDATE callup_players SET roster_player_id=? WHERE roster_player_id=?').bind(playerId, duplicate.id),
+      env.JDM_DB.prepare('UPDATE match_goals SET roster_player_id=? WHERE roster_player_id=?').bind(playerId, duplicate.id),
+      env.JDM_DB.prepare('DELETE FROM roster_players WHERE id=?').bind(duplicate.id)
+    );
+    statements.push(
+      env.JDM_DB.prepare('UPDATE roster_players SET user_id=?,status=? WHERE id=? AND team_id=?').bind(userId, 'active', playerId, teamId),
+      env.JDM_DB.prepare("INSERT OR IGNORE INTO team_member_roles(team_id,user_id,role) VALUES(?,?,'player')").bind(teamId, userId),
+      env.JDM_DB.prepare("UPDATE team_members SET role=CASE WHEN role='manager' THEN 'manager' WHEN role='delegate' THEN 'delegate' ELSE 'player' END,status='active' WHERE team_id=? AND user_id=?").bind(teamId, userId)
+    );
+    await env.JDM_DB.batch(statements);
+    return json({ linked: true, mergedRosterId: duplicate?.id || null });
+  }
+  const memberRole = url.pathname.match(/^\/api\/teams\/([^/]+)\/members\/([^/]+)\/roles\/([^/]+)$/);
+  if (memberRole && request.method === 'DELETE') {
+    const teamId = decodeURIComponent(memberRole[1]);
+    const userId = decodeURIComponent(memberRole[2]);
+    const role = decodeURIComponent(memberRole[3]);
+    await requirePermission(env, account.userId, teamId, 'members.manage');
+    if (!['manager', 'delegate', 'player'].includes(role)) return json({ error: 'Rol no válido.' }, 400);
+    const existing = await env.JDM_DB.prepare('SELECT 1 ok FROM team_member_roles WHERE team_id=? AND user_id=? AND role=?').bind(teamId, userId, role).first();
+    if (!existing) return json({ error: 'La persona no tiene ese rol.' }, 404);
+    if (role === 'manager' && await isLastActiveManager(env, teamId, userId)) return json({ error: 'El equipo debe conservar al menos un mánager.' }, 409);
+    await env.JDM_DB.prepare('DELETE FROM team_member_roles WHERE team_id=? AND user_id=? AND role=?').bind(teamId, userId, role).run();
+    if (role === 'player') await env.JDM_DB.prepare('UPDATE roster_players SET user_id=NULL WHERE team_id=? AND user_id=?').bind(teamId, userId).run();
+    const remaining = await env.JDM_DB.prepare('SELECT role FROM team_member_roles WHERE team_id=? AND user_id=?').bind(teamId, userId).all();
+    if (!remaining.results.length) {
+      await env.JDM_DB.prepare('DELETE FROM team_members WHERE team_id=? AND user_id=?').bind(teamId, userId).run();
+      await cleanupWorkspaceMembership(env, teamId, userId);
+      return json({ removed: true, accessRemoved: true, roles: [] });
+    }
+    const roles = remaining.results.map(item => item.role);
+    await env.JDM_DB.prepare('UPDATE team_members SET role=? WHERE team_id=? AND user_id=?').bind(primaryRole(roles), teamId, userId).run();
+    return json({ removed: true, accessRemoved: false, roles });
+  }
+  const memberAccess = url.pathname.match(/^\/api\/teams\/([^/]+)\/members\/([^/]+)$/);
+  if (memberAccess && request.method === 'DELETE') {
+    const teamId = decodeURIComponent(memberAccess[1]);
+    const userId = decodeURIComponent(memberAccess[2]);
+    await requirePermission(env, account.userId, teamId, 'members.manage');
+    const member = await env.JDM_DB.prepare('SELECT 1 ok FROM team_members WHERE team_id=? AND user_id=?').bind(teamId, userId).first();
+    if (!member) return json({ error: 'La persona no pertenece al equipo.' }, 404);
+    if (await isLastActiveManager(env, teamId, userId)) return json({ error: 'El equipo debe conservar al menos un mánager.' }, 409);
+    await env.JDM_DB.batch([
+      env.JDM_DB.prepare('UPDATE roster_players SET user_id=NULL WHERE team_id=? AND user_id=?').bind(teamId, userId),
+      env.JDM_DB.prepare('DELETE FROM team_members WHERE team_id=? AND user_id=?').bind(teamId, userId)
+    ]);
+    await cleanupWorkspaceMembership(env, teamId, userId);
+    return json({ removed: true });
   }
   const responseMatch = url.pathname.match(/^\/api\/callups\/([^/]+)\/respond$/);
   if (responseMatch && request.method === 'POST') {

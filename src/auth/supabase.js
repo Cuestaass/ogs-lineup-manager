@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { confirmationRedirect, safeReturnTo } from './returnTo.js';
 
 const LOCAL_SESSION_KEY = 'ogs-session-v1';
 const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
@@ -61,13 +62,13 @@ export async function signIn(email, password) {
   if (error) throw error;
 }
 
-export async function signUp(email, password, fullName) {
+export async function signUp(email, password, fullName, returnTo = '/organizador/') {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: { full_name: fullName },
-      emailRedirectTo: `${location.origin}/login/`
+      emailRedirectTo: confirmationRedirect(location.origin, safeReturnTo(returnTo))
     }
   });
   if (error) throw error;
