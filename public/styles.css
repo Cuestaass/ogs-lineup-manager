@@ -473,6 +473,114 @@ h3 { font-size: 1rem; }
 .skip-link { visibility: hidden; }
 .skip-link:focus { visibility: visible; }
 
+/* Lineups polish: preserve the field notebook look while tightening access and touch. */
+#alineaciones {
+  --muted: #c5d0be;
+  --border: #607866;
+  scroll-margin-top: 18px;
+}
+#alineaciones .teams-heading { align-items: flex-end; margin-bottom: 26px; }
+#alineaciones .teams-heading > div > p:last-child { max-width: 56ch; color: #d2dccb; font-size: .95rem; }
+#alineaciones h2 { font-size: clamp(2.15rem, 4vw, 2.8rem); line-height: 1.02; }
+#alineaciones .team-card { padding-top: 24px; border-top-color: #718778; }
+#alineaciones .team-name-input { min-height: 50px; color: #f3efe1; font-size: clamp(1.9rem, 3vw, 2.4rem); }
+#alineaciones .team-meta { color: #c5d0be; line-height: 1.45; }
+#alineaciones .team-controls label > span,
+#alineaciones .lineup-callup-controls label > span { color: #d0dac8; }
+#alineaciones .team-controls button,
+#alineaciones .export-actions button,
+#alineaciones .lineup-callup-controls button { min-height: 46px; }
+#alineaciones .team-controls button.secondary,
+#alineaciones .export-actions button.secondary,
+#alineaciones .lineup-callup-controls button.secondary { color: #f3efe1; border-color: #879b88; }
+#alineaciones .team-controls button.secondary:hover,
+#alineaciones .export-actions button.secondary:hover,
+#alineaciones .lineup-callup-controls button.secondary:hover { color: var(--ink); background: #eae5d5; }
+#alineaciones .danger { color: #ffd0bd; }
+#alineaciones .danger:hover { color: #69271d; background: #ffd9ca; border-color: #ffd9ca; }
+#alineaciones .lineup-meter { gap: 14px; }
+#alineaciones .lineup-total { color: #e0e7d3; }
+#alineaciones .lineup-caption { max-width: 12ch; color: #c5d0be; font-size: .78rem; }
+#alineaciones .lineup-meter.is-complete .lineup-caption { color: var(--marker); }
+#alineaciones .lineup-callup-controls { gap: 10px 12px; padding: 14px; border-color: #607866; background: #213d32; }
+#alineaciones .lineup-source-label { color: #d0dac8; font-size: .76rem; line-height: 1.4; }
+#alineaciones .pitch-slot { min-height: 58px; border-color: #d1dec8; background: #10271f18; }
+#alineaciones .pitch-slot:hover,
+#alineaciones .pitch-slot.drop-active { background: #e4ed7925; border-color: var(--marker); }
+#alineaciones .pitch-slot[tabindex="0"] { cursor: pointer; }
+#alineaciones .pitch-slot:focus-visible,
+#alineaciones .bench[tabindex="0"]:focus-visible { z-index: 4; outline: 3px solid #fff; outline-offset: 3px; }
+#alineaciones .slot-role { color: #fff; font-size: .68rem; text-shadow: 0 1px 2px #10271f; }
+#alineaciones .player-chip { min-height: 44px; gap: 7px; border-color: #f3efe1; background: #f3efe1; color: #172f29; font-size: .88rem; line-height: 1.15; }
+#alineaciones .player-chip:hover { background: #fff9e8; border-color: var(--marker); }
+#alineaciones .player-chip[aria-pressed="true"] { outline: 3px solid var(--marker); outline-offset: 3px; background: #fff9e8; }
+#alineaciones .player-chip:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+#alineaciones .player-chip .shirt-number { width: 28px; height: 28px; font-size: .9rem; }
+#alineaciones .bench { min-height: 88px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 145px), 1fr)); gap: 9px; padding: 12px; border-color: #819484; background: #233e33; }
+#alineaciones .bench-empty { padding: 12px; color: #d5dfd0; font-size: .9rem; }
+#alineaciones .natural-subs-section { padding: 18px; border-color: #d0ccba; }
+#alineaciones .natural-subs-heading p { color: #596052; line-height: 1.45; }
+#alineaciones .natural-sub-row { gap: 12px; }
+#alineaciones .natural-player,
+#alineaciones .natural-sub-choice { min-height: 72px; border-radius: 2px; }
+#alineaciones .natural-subs-empty { border-radius: 2px; line-height: 1.5; }
+#alineaciones .team-list-section { margin-top: 20px; padding-top: 16px; }
+#alineaciones .team-roster-list { columns: 1; padding-left: 24px; color: #4d5b50; font-size: .9rem; }
+#alineaciones .team-roster-list strong { color: #172f29; }
+#lineup-empty { padding: 16px 18px; border: 1px dashed #819484; border-left: 4px solid var(--marker); background: #213d32; color: #f3efe1; line-height: 1.55; }
+#lineup-empty a { color: var(--marker); font-weight: 700; }
+#lineup-empty a:hover { color: #fff9d8; }
+
+@media (min-width: 1101px) {
+  #alineaciones .team-card { grid-template-columns: minmax(170px, 190px) minmax(340px, 460px) minmax(280px, 1fr); column-gap: clamp(22px, 2.2vw, 34px); }
+  #alineaciones .team-controls { margin-top: 26px; }
+  #alineaciones .team-notes { padding: 24px; }
+}
+@media (max-width: 1100px) {
+  #alineaciones .team-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .9fr); gap: 0 22px; }
+  #alineaciones .team-card-header, #alineaciones .export-actions, #alineaciones .lineup-callup-controls { grid-column: 1; }
+  #alineaciones .pitch-export-area { grid-column: 2; grid-row: 1 / span 3; }
+  #alineaciones .team-notes { grid-column: 1 / -1; margin-top: 22px; }
+  #alineaciones .team-controls { margin-top: 18px; }
+}
+@media (max-width: 700px) {
+  #alineaciones { padding-top: 22px; padding-bottom: 26px; }
+  #alineaciones .teams-heading { margin-bottom: 20px; }
+  #alineaciones .team-card { display: block; padding-top: 20px; }
+  #alineaciones .team-card-header { display: flex; align-items: flex-start; }
+  #alineaciones .team-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
+  #alineaciones .team-controls label { grid-column: 1 / -1; width: 100%; }
+  #alineaciones .team-controls button { width: 100%; }
+  #alineaciones .export-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 14px 0; }
+  #alineaciones .export-actions button { width: 100%; }
+  #alineaciones .export-actions .delete-team { grid-column: 1 / -1; margin: 0; }
+  #alineaciones .lineup-callup-controls { grid-template-columns: minmax(0, 1fr); margin: 14px 0 18px; padding: 14px; }
+  #alineaciones .lineup-callup-controls button,
+  #alineaciones .lineup-source-label { grid-column: 1; }
+  #alineaciones .pitch-export-area { margin-inline: auto; width: min(100%, 430px); }
+  #alineaciones .team-notes { margin-top: 20px; padding: 18px 14px; }
+  #alineaciones .lineup-meter { margin-top: 10px; }
+  #alineaciones .lineup-total { font-size: 2.65rem; }
+  #alineaciones .lineup-caption { max-width: 15ch; }
+  #alineaciones .pitch-slot { min-height: 52px; }
+  #alineaciones .natural-subs-section { padding: 16px 12px; }
+  #alineaciones .natural-sub-row { grid-template-columns: minmax(0, 1fr); gap: 7px; }
+  #alineaciones .natural-sub-connector { transform: rotate(90deg); line-height: 1; }
+  #alineaciones .natural-player,
+  #alineaciones .natural-sub-choice { min-height: 0; }
+  #alineaciones .team-roster-list { columns: 1; }
+}
+@media (max-width: 380px) {
+  #alineaciones .team-controls { grid-template-columns: 1fr; }
+  #alineaciones .team-controls label { grid-column: 1; }
+  #alineaciones .export-actions { grid-template-columns: 1fr; }
+  #alineaciones .export-actions .delete-team { grid-column: 1; }
+  #alineaciones .bench { grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #alineaciones *, #alineaciones *::before, #alineaciones *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
 /* Tactical room — a working surface, not another dashboard. */
 body[data-page="tactica"] { background: #10271f; }
 .tactics-header {

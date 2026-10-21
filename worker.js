@@ -275,7 +275,10 @@ async function authenticatedApi(request, env, ctx, url) {
       const access = await teamAccess(env, account.userId, teamId);
       if (!access) return json({ error: 'No perteneces al equipo.' }, 403);
       const rows = await env.JDM_DB.prepare("SELECT c.id,c.match_id,c.title,c.starts_at,c.response_deadline,c.cancelled_at,COUNT(cp.roster_player_id) invited,SUM(cp.response='available') available,SUM(cp.response='unavailable') unavailable,(SELECT mine.response FROM callup_players mine JOIN roster_players rp ON rp.id=mine.roster_player_id WHERE mine.callup_id=c.id AND rp.user_id=? LIMIT 1) my_response FROM callups c LEFT JOIN callup_players cp ON cp.callup_id=c.id WHERE c.team_id=? GROUP BY c.id ORDER BY c.starts_at DESC").bind(account.userId, teamId).all();
-      return json(rows.results);
+      const playerRows = access.permissions.includes('callups.manage') ? await env.JDM_DB.prepare("SELECT cp.callup_id,rp.id,rp.display_name,rp.number,cp.response,cp.responded_at FROM callup_players cp JOIN roster_players rp ON rp.id=cp.roster_player_id JOIN callups c ON c.id=cp.callup_id WHERE c.team_id=? AND rp.status='active' ORDER BY c.starts_at DESC,rp.number,rp.display_name").bind(teamId).all() : { results: [] };
+      const playersByCallup = new Map();
+      for (const player of playerRows.results) playersByCallup.set(player.callup_id, [...(playersByCallup.get(player.callup_id) || []), { id: player.id, display_name: player.display_name, number: player.number, response: player.response, responded_at: player.responded_at }]);
+      return json(rows.results.map(callup => ({ ...callup, players: playersByCallup.get(callup.id) || [] })));
     }
     if (resource === 'callups' && request.method === 'POST') {
       await requirePermission(env, account.userId, teamId, 'callups.manage');
