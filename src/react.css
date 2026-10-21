@@ -89,9 +89,12 @@
   .management-main { padding-top: 18px; }
   .management-badge { width: 100%; overflow-wrap: anywhere; }
   .management-section { margin-top: 30px; }
-  .management-summary { grid-template-columns: 1fr; }
-  .management-summary div { border-right: 0; border-bottom: 1px solid var(--border); }
+  .management-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .management-summary div { min-width: 0; padding: 12px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .management-summary div:first-child { grid-column: 1 / -1; }
+  .management-summary div:nth-child(2) { border-right: 1px solid var(--border); border-bottom: 0; }
   .management-summary div:last-child { border-bottom: 0; }
+  .management-summary strong { font-size: 1rem; overflow-wrap: anywhere; }
   .management-form, .management-form.compact { grid-template-columns: 1fr; }
   .management-form > label, .management-form.compact > label:first-child, .management-form.compact > button { grid-column: 1; }
   .invite-result { grid-template-columns: 1fr; }
@@ -100,6 +103,8 @@
   .callup-response { justify-content: flex-start; }
   .callup-response button { flex: 1 1 130px; }
   .management-form button { width: 100%; }
+  .management-section { padding-top: 20px; }
+  .management-columns { gap: 24px; margin-top: 18px; }
   .roster-cards { grid-template-columns: 1fr; }
   .roster-link-form { grid-template-columns: 1fr; }
   .roster-link-form button { width: 100%; }
@@ -110,6 +115,9 @@
   .management-members-table .players-table td:nth-child(4) { grid-column: 1; grid-row: 4; }
   .management-members-table .players-table td::before { content: attr(data-label) ': '; color: var(--muted); font-size: .66rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
   .management-members-table .players-table td:first-child::before { display: none; }
+  .management-members-table .players-table tr { margin-bottom: 10px; padding: 12px; border: 1px solid var(--border); background: var(--panel); }
+  .management-members-table .players-table td { padding-block: 4px; }
+  .member-access-remove { width: 100%; margin-top: 5px; border-color: var(--danger); }
   .join-screen { padding-inline: 20px; }
   .join-card { width: 100%; padding: 26px 20px; }
   .join-card h1 { overflow-wrap: anywhere; }
