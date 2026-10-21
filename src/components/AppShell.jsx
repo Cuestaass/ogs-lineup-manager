@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { canAccessPage } from '../../access.js';
 
 const items = [
-  ['equipo', '/equipo/', 'Gestión del equipo', 'Equipo', <><path d="M4 20v-2a4 4 0 014-4h8a4 4 0 014 4v2"/><circle cx="12" cy="7" r="4"/></>],
+  ['equipo', '/equipo/#inicio', 'El equipo', 'Equipo', <><path d="M4 20v-2a4 4 0 014-4h8a4 4 0 014 4v2"/><circle cx="12" cy="7" r="4"/></>],
   ['organizador', '/organizador/', 'La pizarra', 'Alineación', <><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 3v18M3 12h18M8 8l2 2m4 4 2 2"/></>],
   ['tactica', '/tactica/', 'Pizarra táctica', 'Táctica', <><path d="M4 4h16v16H4zM12 4v16"/><circle cx="12" cy="12" r="3"/><path d="M7 8l2 2m6 4 2 2"/></>],
   ['jdm', '/jdm/', 'Partidos y clasificación', 'Partidos', <path d="M4 19V5m0 0h16v14H4zM8 15l3-3 2 2 3-4"/>]
