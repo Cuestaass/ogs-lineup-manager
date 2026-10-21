@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api, getSession } from '../auth/supabase.js';
 
 const readJson = async response => {
@@ -11,10 +11,12 @@ const roleName = role => role === 'delegate' ? 'delegado' : 'jugador';
 
 export default function JoinTeamPage() {
   const token = new URLSearchParams(location.search).get('token') || '';
+  const autoAccept = new URLSearchParams(location.search).get('accept') === '1';
   const [session, setSession] = useState(null);
   const [invitation, setInvitation] = useState(null);
   const [status, setStatus] = useState(token ? 'Comprobando invitación…' : 'Falta el token de invitación.');
   const [joined, setJoined] = useState(false);
+  const accepting = useRef(false);
 
   useEffect(() => {
     getSession().then(setSession).catch(error => setStatus(error.message));
@@ -25,15 +27,28 @@ export default function JoinTeamPage() {
     }).catch(error => setStatus(error.message));
   }, [token]);
 
-  async function accept() {
+  async function accept(redirect = false) {
+    if (accepting.current) return;
+    accepting.current = true;
     setStatus('Uniéndote al equipo…');
     try {
       const result = await readJson(await api(`/api/invites/${encodeURIComponent(token)}/accept`, { method: 'POST' }));
       localStorage.setItem('ogs-active-team-v1', result.teamId);
+      if (redirect) {
+        location.replace('/equipo/');
+        return;
+      }
       setJoined(true);
       setStatus('');
-    } catch (error) { setStatus(error.message); }
+    } catch (error) {
+      accepting.current = false;
+      setStatus(error.message);
+    }
   }
+
+  useEffect(() => {
+    if (autoAccept && session && invitation && !joined) accept(true);
+  }, [autoAccept, session, invitation, joined]);
 
   const returnTo = `${location.pathname}${location.search}`;
   return <main id="main-content" className="join-screen">
@@ -45,7 +60,7 @@ export default function JoinTeamPage() {
         {invitation && <div className="join-details"><div><span>Te unes como</span><strong>{roleName(invitation.role)}</strong></div><div><span>Tipo de acceso</span><strong>{invitation.mode === 'single' ? 'individual' : 'colectivo'}</strong></div><div><span>Caduca</span><strong>{new Date(invitation.expiresAt).toLocaleDateString('es-ES')}</strong></div></div>}
         {status && <p className="join-status" role="status">{status}</p>}
         {invitation && !session && <><p>Identifícate antes de aceptar. Volverás a esta invitación después del acceso.</p><a className="header-link join-primary" href={`/login/?returnTo=${encodeURIComponent(returnTo)}`}>Identificarme y continuar</a></>}
-        {invitation && session && <button type="button" className="primary join-primary" onClick={accept}>Aceptar invitación</button>}
+        {invitation && session && !autoAccept && <button type="button" className="primary join-primary" onClick={() => accept()}>Aceptar invitación</button>}
       </>}
     </section>
   </main>;
