@@ -11,7 +11,7 @@ function initial(teamId) {
   return {
     members: [{ user_id: `pilot-manager-${pilot.slug}`, role: 'manager', roles: ['manager'], status: 'active', display_name: `Manager · ${pilot.name}`, email: `${pilot.slug}@piloto.local` }],
     invites: [], roster: [], callups: [],
-    matches: [{ id: `${teamId}:pilot-final`, date: '10/10/2026', home: pilot.name, away: 'Rival piloto', status: 'F' }],
+    matches: [{ id: `${teamId}:pilot-final`, date: '10/10/2026', home: pilot.name, away: 'Rival piloto', homeScore: 2, awayScore: 1, isHome: true, status: 'F' }],
     goals: [], teamId
   };
 }
@@ -119,6 +119,9 @@ export async function localApi(path, options = {}) {
         const match = state.matches.find(item => item.id === body.matchId && item.status === 'F');
         const player = state.roster.find(item => item.id === body.rosterPlayerId);
         if (!match || !player) return json({ error: 'Partido o goleador no válido.' }, 400);
+        const teamScore = match.isHome ? match.homeScore : match.awayScore;
+        if (!Number.isSafeInteger(teamScore) || teamScore < 0) return json({ error: 'No se pueden registrar goleadores sin un marcador oficial válido.' }, 409);
+        if (state.goals.filter(goal => goal.match_id === match.id).length >= teamScore) return json({ error: `Ya están registrados los ${teamScore} goles oficiales de nuestro equipo.` }, 409);
         const goal = { id: crypto.randomUUID(), match_id: match.id, roster_player_id: player.id, player_name: player.display_name, minute: body.minute == null || body.minute === '' ? null : Number(body.minute) };
         state.goals.unshift(goal); write(teamId, state); return json({ id: goal.id }, 201);
       }

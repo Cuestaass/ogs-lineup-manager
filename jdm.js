@@ -23,6 +23,7 @@ function fixture(row, teamCode) {
   return {
     id: matchId(row), season: number(row.Codigo_temporada), round: number(row.Jornada),
     home: row.Equipo_local, away: row.Equipo_visitante,
+    homeScore: number(row.Resultado1), awayScore: number(row.Resultado2),
     homeCode: String(row.Codigo_equipo1), awayCode: String(row.Codigo_equipo2),
     date: row.Fecha || null, time: row.Hora || null, venue: row.Campo || null,
     scheduled: String(row.Programado) === '1', status: row.Estado || '',

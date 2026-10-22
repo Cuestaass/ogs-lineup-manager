@@ -9,7 +9,7 @@ async function readJson(response) {
   return body;
 }
 
-function GoalForm({ match, roster, base, onRecorded }) {
+function GoalForm({ match, roster, base, onRecorded, currentGoals, maxGoals }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   async function submit(event) {
@@ -37,6 +37,8 @@ function GoalForm({ match, roster, base, onRecorded }) {
       setMessage('Gol registrado. No se pudo actualizar la lista; pulsa Actualizar partidos para verlo.');
     } finally { setSaving(false); }
   }
+  if (maxGoals == null) return <p className="match-empty">No se pueden registrar goles mientras el marcador oficial no esté disponible.</p>;
+  if (currentGoals >= maxGoals) return <p className="match-empty">Ya están registrados los {maxGoals} goles oficiales de nuestro equipo.</p>;
   return <form className="match-goal-form" aria-label={`Registrar gol en ${match.home} contra ${match.away}`} onSubmit={submit}>
     <fieldset disabled={saving}>
       <legend>Registrar gol</legend>
@@ -52,16 +54,18 @@ function GoalForm({ match, roster, base, onRecorded }) {
 
 export function MatchDetail({ match, goals, roster, base, onRecorded, rosterError }) {
   const matchGoals = goalsForMatch(goals, match.id);
+  const hasScore = Number.isFinite(match.homeScore) && Number.isFinite(match.awayScore);
+  const teamScore = hasScore ? (match.isHome ? match.homeScore : match.awayScore) : null;
   return <details className="match-record">
     <summary><div className="match-record-summary"><span className="match-record-date">{match.date || 'Fecha pendiente'}{match.round != null && <small>Jornada {match.round}</small>}</span><strong>{match.home} <span aria-hidden="true">–</span> {match.away}</strong><span className="match-record-state">Finalizado</span><span className="match-record-open">Ver detalle <span aria-hidden="true">↓</span></span></div></summary>
     <div className="match-record-body">
-      <dl className="match-information"><div><dt>Resultado oficial</dt><dd>Finalizado · marcador no disponible</dd></div><div><dt>Hora</dt><dd>{match.time || 'No indicada'}</dd></div><div><dt>Campo</dt><dd>{match.venue || 'No indicado'}</dd></div></dl>
+      <dl className="match-information"><div><dt>Resultado oficial</dt><dd>Finalizado · {hasScore ? `${match.homeScore} – ${match.awayScore}` : 'marcador no disponible'}</dd></div><div><dt>Hora</dt><dd>{match.time || 'No indicada'}</dd></div><div><dt>Campo</dt><dd>{match.venue || 'No indicado'}</dd></div></dl>
       {match.observation && <p className="match-observation">{match.observation}</p>}
       <div className="match-statistics" aria-label="Estadísticas del partido">
         <section className="match-stat-section" aria-label="Goles del equipo">
           <div className="match-stat-heading"><div><p className="eyebrow">ACTA DEL EQUIPO</p><h3>Goleadores</h3></div><span className="match-stat-count">{matchGoals.length} {matchGoals.length === 1 ? 'gol registrado' : 'goles registrados'}</span></div>
           {matchGoals.length ? <ul className="match-goals">{matchGoals.map(goal => <li key={goal.id}><strong>{goal.player_name}</strong><span>{goal.minute == null ? 'Minuto no indicado' : `${goal.minute}′`}</span></li>)}</ul> : <p className="match-empty">Todavía no hay goles registrados para este partido.</p>}
-          {rosterError ? <p className="match-empty" role="status">No se pudo cargar la plantilla. Pulsa Actualizar partidos para reintentar.</p> : roster.length ? <GoalForm match={match} roster={roster} base={base} onRecorded={onRecorded}/> : <p className="match-empty">Añade jugadores a la <a href="/equipo/#plantilla">plantilla</a> para registrar goles.</p>}
+          {rosterError ? <p className="match-empty" role="status">No se pudo cargar la plantilla. Pulsa Actualizar partidos para reintentar.</p> : roster.length ? <GoalForm match={match} roster={roster} base={base} onRecorded={onRecorded} currentGoals={matchGoals.length} maxGoals={teamScore}/> : <p className="match-empty">Añade jugadores a la <a href="/equipo/#plantilla">plantilla</a> para registrar goles.</p>}
         </section>
       </div>
     </div>
