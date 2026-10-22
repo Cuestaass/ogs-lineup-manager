@@ -751,3 +751,32 @@ body[data-page="tactica"] { background: #10271f; }
   #alineaciones .players-panel { grid-area: players; }
   #alineaciones .team-notes > summary { display: flex; }
 }
+
+/* Compact lineup toolbar, keeping the pitch first on narrow screens. */
+.header-export { position: relative; display: flex; flex-wrap: wrap; gap: 6px; }
+.header-export > summary, .export-actions > summary { cursor: pointer; min-height: 44px; padding: 10px 14px; border: 1px solid var(--border); }
+.header-export[open] { align-items: center; }
+#alineaciones .team-card-header { align-items: center; }
+#alineaciones .lineup-tools { order: 1; width: 100%; min-width: 0; border: 1px solid #607866; background: #213d32; }
+#alineaciones .lineup-tools > summary { min-height: 44px; }
+#alineaciones .lineup-tools .team-controls { display: flex; flex-wrap: wrap; align-items: end; margin: 0; padding: 0 12px; gap: 8px; }
+#alineaciones .lineup-tools .team-controls label { flex: 1 1 125px; width: auto; min-width: 0; }
+#alineaciones .lineup-tools .team-controls button { flex: 1 1 130px; min-height: 44px; }
+#alineaciones .lineup-tools .team-controls select { width: 100%; min-height: 44px; }
+#alineaciones .lineup-tools .export-actions { display: block; margin: 0; position: relative; }
+#alineaciones .lineup-tools .export-actions > button { margin: 4px; min-height: 44px; }
+#alineaciones .lineup-tools .delete-team { margin: 10px 12px; min-height: 44px; }
+#alineaciones .lineup-meter { margin-top: 8px; }
+#alineaciones .lineup-total { font-size: 1.8rem; }
+@media (min-width: 701px) {
+ #alineaciones .team-card { display: flex; }
+ #alineaciones .team-card-header { display: flex; flex-wrap: wrap; width: 100%; }
+ #alineaciones .lineup-tools { order: 1; }
+ #alineaciones .pitch-export-area { order: 2; width: min(100%, 680px); align-self: center; margin-inline: auto; }
+ #alineaciones .players-panel { order: 3; }
+ #alineaciones .pitch { aspect-ratio: .73; }
+}
+@media (min-width: 1101px) {
+ #alineaciones .team-card { display: flex; }
+ #alineaciones .pitch-export-area { width: min(100%, 760px); }
+}

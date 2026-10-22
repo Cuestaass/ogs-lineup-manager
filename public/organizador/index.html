@@ -21,8 +21,7 @@
       <p>Prepara el siete. Organiza los cambios. Lleva tu equipo al campo.</p>
     </div>
     <div class="header-actions">
-      <button id="export-all-png" class="secondary">Exportar todos · PNG</button>
-      <button id="export-all-pdf" class="secondary">Exportar todos · PDF</button>
+      <details class="header-export"><summary>Exportar todos</summary><button id="export-all-png" class="secondary">Todos · PNG</button><button id="export-all-pdf" class="secondary">Todos · PDF</button></details>
     </div>
   </header>
 
@@ -132,35 +131,22 @@
           <p class="team-meta"></p>
           <div class="lineup-meter"><span class="lineup-total"></span><span class="lineup-caption">Titulares en campo</span></div>
         </div>
-      </div>
-      <details class="lineup-tools">
-        <summary>Herramientas de alineación</summary>
-        <div class="team-controls">
-          <label>
-            <span>Formación</span>
-            <select class="formation-select">
-              <option value="321">3-2-1</option>
-              <option value="231">2-3-1</option>
-              <option value="222">2-2-2</option>
-              <option value="132">1-3-2</option>
-              <option value="312">3-1-2</option>
-            </select>
-          </label>
-          <button class="auto-lineup primary">Alinear 7</button>
-          <button class="bench-all secondary">Todos al banquillo</button>
-        </div>
-      <div class="export-actions">
-        <button class="export-png secondary">Exportar PNG</button>
-        <button class="export-pdf secondary">Exportar PDF</button>
-        <button class="delete-team danger ghost">Eliminar equipo</button>
-      </div>
-
-      <div class="lineup-callup-controls">
-        <label><span>Jugadores alineables</span><select class="lineup-callup-select"><option value="">Toda la plantilla</option></select></label>
-        <button type="button" class="lineup-callup-apply secondary">Usar selección</button>
-        <small class="lineup-source-label">Alineables: toda la plantilla + refuerzos temporales</small>
-      </div>
+        <details class="lineup-tools">
+          <summary>Herramientas</summary>
+          <div class="team-controls">
+            <label><span>Equipo activo</span><select class="active-team-select" aria-label="Equipo activo"></select></label>
+            <label><span>Formación</span><select class="formation-select"><option value="321">3-2-1</option><option value="231">2-3-1</option><option value="222">2-2-2</option><option value="132">1-3-2</option><option value="312">3-1-2</option></select></label>
+            <button class="auto-lineup primary">Alinear 7</button><button class="bench-all secondary">Todos al banquillo</button>
+            <details class="export-actions"><summary>Exportar</summary><button class="export-png secondary">PNG</button><button class="export-pdf secondary">PDF</button></details>
+          </div>
+          <button class="delete-team danger ghost">Eliminar equipo</button>
+          <div class="lineup-callup-controls">
+            <label><span>Jugadores alineables</span><select class="lineup-callup-select"><option value="">Toda la plantilla</option></select></label>
+            <button type="button" class="lineup-callup-apply secondary">Usar selección</button>
+            <small class="lineup-source-label">Alineables: toda la plantilla + refuerzos temporales</small>
+          </div>
         </details>
+      </div>
 
       <div class="pitch-export-area">
         <div class="player-selection" role="status" aria-live="polite" hidden>

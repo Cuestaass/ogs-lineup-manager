@@ -555,6 +555,7 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
     state.teams.forEach(team => {
       const card = dom.teamTemplate.content.firstElementChild.cloneNode(true);
       card.dataset.teamId = team.id;
+      card.dataset.teamId = team.id;
       for (const control of card.querySelectorAll('input, select, button')) {
         control.dataset.focusKey = `${team.id}-${control.classList[0]}`;
       }
@@ -597,6 +598,15 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
       card.querySelector('.lineup-source-label').textContent = activeCallup ? `Alineables: ${activeCallup.title} + refuerzos temporales` : 'Alineables: toda la plantilla + refuerzos temporales';
 
       const formationSelect = card.querySelector('.formation-select');
+      const activeTeamSelect = card.querySelector('.active-team-select');
+      for (const optionTeam of state.teams) {
+        const option = document.createElement('option'); option.value = optionTeam.id; option.textContent = optionTeam.name;
+        activeTeamSelect.appendChild(option);
+      }
+      activeTeamSelect.value = team.id;
+      activeTeamSelect.addEventListener('change', () => {
+        document.querySelector(`.team-card[data-team-id="${CSS.escape(activeTeamSelect.value)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
       formationSelect.value = team.formation;
       formationSelect.addEventListener('change', () => {
         team.formation = formationSelect.value;
