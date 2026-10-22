@@ -275,7 +275,7 @@ async function authenticatedApi(request, env, ctx, url) {
       const access = await teamAccess(env, account.userId, teamId);
       if (!access) return json({ error: 'No perteneces al equipo.' }, 403);
       const rows = await env.JDM_DB.prepare("SELECT c.id,c.match_id,c.title,c.starts_at,c.response_deadline,c.cancelled_at,COUNT(cp.roster_player_id) invited,SUM(cp.response='available') available,SUM(cp.response='unavailable') unavailable,(SELECT mine.response FROM callup_players mine JOIN roster_players rp ON rp.id=mine.roster_player_id WHERE mine.callup_id=c.id AND rp.user_id=? LIMIT 1) my_response FROM callups c LEFT JOIN callup_players cp ON cp.callup_id=c.id WHERE c.team_id=? GROUP BY c.id ORDER BY c.starts_at DESC").bind(account.userId, teamId).all();
-      const playerRows = access.permissions.includes('callups.manage') ? await env.JDM_DB.prepare("SELECT cp.callup_id,rp.id,rp.display_name,rp.number,cp.response,cp.responded_at FROM callup_players cp JOIN roster_players rp ON rp.id=cp.roster_player_id JOIN callups c ON c.id=cp.callup_id WHERE c.team_id=? AND rp.status='active' ORDER BY c.starts_at DESC,rp.number,rp.display_name").bind(teamId).all() : { results: [] };
+      const playerRows = hasPermission(access.roles, 'callups.manage') ? await env.JDM_DB.prepare("SELECT cp.callup_id,rp.id,rp.display_name,rp.number,cp.response,cp.responded_at FROM callup_players cp JOIN roster_players rp ON rp.id=cp.roster_player_id JOIN callups c ON c.id=cp.callup_id WHERE c.team_id=? AND rp.status='active' ORDER BY c.starts_at DESC,rp.number,rp.display_name").bind(teamId).all() : { results: [] };
       const playersByCallup = new Map();
       for (const player of playerRows.results) playersByCallup.set(player.callup_id, [...(playersByCallup.get(player.callup_id) || []), { id: player.id, display_name: player.display_name, number: player.number, response: player.response, responded_at: player.responded_at }]);
       return json(rows.results.map(callup => ({ ...callup, players: playersByCallup.get(callup.id) || [] })));
@@ -313,10 +313,13 @@ async function authenticatedApi(request, env, ctx, url) {
       const snapshot = team?.external_team_slug ? await env.JDM_DB.prepare('SELECT payload FROM jdm_snapshots WHERE slug=?').bind(team.external_team_slug).first() : null;
       const match = snapshot && JSON.parse(snapshot.payload).fixtures?.find(item => item.id === body.matchId);
       if (!match || match.status !== 'F') return json({ error: 'Los goleadores sólo pueden registrarse cuando el resultado oficial sea definitivo.' }, 409);
+      const teamScore = match.isHome ? match.homeScore : match.awayScore;
+      if (!Number.isSafeInteger(teamScore) || teamScore < 0) return json({ error: 'No se pueden registrar goleadores sin un marcador oficial válido.' }, 409);
       const player = await env.JDM_DB.prepare('SELECT id FROM roster_players WHERE id=? AND team_id=? AND status=?').bind(body.rosterPlayerId, teamId, 'active').first();
       if (!player) return json({ error: 'El goleador no pertenece a la plantilla activa.' }, 400);
       const id = crypto.randomUUID();
-      await env.JDM_DB.prepare('INSERT INTO match_goals(id,team_id,match_id,roster_player_id,minute,created_by) VALUES(?,?,?,?,?,?)').bind(id, teamId, body.matchId, player.id, body.minute == null ? null : Number(body.minute), account.userId).run();
+      const inserted = await env.JDM_DB.prepare('INSERT INTO match_goals(id,team_id,match_id,roster_player_id,minute,created_by) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM match_goals WHERE team_id=? AND match_id=?) < ?').bind(id, teamId, body.matchId, player.id, body.minute == null ? null : Number(body.minute), account.userId, teamId, body.matchId, teamScore).run();
+      if (inserted.meta?.changes !== 1) return json({ error: `Ya están registrados los ${teamScore} goles oficiales de nuestro equipo.` }, 409);
       return json({ id }, 201);
     }
   }
