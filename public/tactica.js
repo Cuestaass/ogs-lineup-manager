@@ -266,7 +266,12 @@
     commit(before);
     announce('Pizarra vaciada.');
   });
-  document.getElementById('tactics-export').addEventListener('click', async () => {
+  const exportButton = document.getElementById('tactics-export');
+  exportButton.addEventListener('click', async () => {
+    if (exportButton.disabled) return;
+    exportButton.disabled = true;
+    exportButton.setAttribute('aria-busy', 'true');
+    exportButton.textContent = 'Preparando PNG…';
     const clone = board.cloneNode(true);
     clone.querySelector('#tactics-preview-layer')?.remove();
     clone.querySelectorAll('.is-selected').forEach(node => node.classList.remove('is-selected'));
@@ -284,6 +289,7 @@
       canvas.width = exportWidth; canvas.height = exportHeight;
       canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('No se pudo crear la imagen');
       const link = document.createElement('a');
       link.download = 'FC-OGS-jugada-tactica.png';
       link.href = URL.createObjectURL(blob);
@@ -291,7 +297,12 @@
       setTimeout(() => URL.revokeObjectURL(link.href), 1000);
       announce('Jugada guardada como PNG.');
     } catch { announce('No se pudo guardar la jugada.'); }
-    finally { URL.revokeObjectURL(url); }
+    finally {
+      URL.revokeObjectURL(url);
+      exportButton.disabled = false;
+      exportButton.removeAttribute('aria-busy');
+      exportButton.textContent = 'Guardar jugada · PNG';
+    }
   });
   document.addEventListener('keydown', event => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); }

@@ -291,6 +291,9 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
     selected = null;
     saveState();
     render();
+    setFeedback(destination === 'bench'
+      ? `${player.name} enviado al banquillo de ${team.name}.`
+      : `${player.name} colocado en la posición ${Number(destination) + 1} de ${team.name}.`);
   }
 
   function autoLineup(teamId) {
@@ -308,11 +311,13 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
   function benchAll(teamId) {
     const team = getTeam(teamId);
     if (!team) return;
+    const starters = team.lineup.map(getPlayer).filter(Boolean).length;
     team.lineup = Array(7).fill(null);
     pruneNaturalSubs(team);
     selected = null;
     saveState();
     render();
+    setFeedback(starters ? `${starters} ${starters === 1 ? 'jugador enviado' : 'jugadores enviados'} al banquillo de ${team.name}.` : `${team.name} ya tenía el campo vacío.`);
   }
 
   function renderNewPlayerTeamChecks() {
@@ -726,7 +731,7 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
       const selection = selected?.teamId === team.id ? getPlayer(selected.playerId) : null;
       const selectionBar = card.querySelector('.player-selection');
       selectionBar.hidden = !selection;
-      card.querySelector('.player-selection-label').textContent = selection ? `#${selection.number ?? '—'} ${selection.name} · Toca una posición para colocarlo.` : '';
+      card.querySelector('.player-selection-label').textContent = selection ? `#${selection.number ?? '—'} ${selection.name} seleccionado · toca una posición para colocarlo.` : '';
       const removeSelected = card.querySelector('.remove-selected');
       removeSelected.hidden = !selection || !team.lineup.includes(selection.id);
       removeSelected.addEventListener('click', () => movePlayer(team.id, selection.id, 'bench'));
