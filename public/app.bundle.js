@@ -454,7 +454,8 @@ const persistState = saveState;
   function movePlayer(teamId, playerId, destination) {
     const team = getTeam(teamId);
     const player = getPlayer(playerId);
-    if (!team || !player || !player.teamIds.includes(team.id)) return;
+    if (!team || !player || !teamMembers(team.id).some(member => member.id === player.id)) return;
+    if (destination !== 'bench' && (!Number.isInteger(Number(destination)) || Number(destination) < 0 || Number(destination) >= 7)) return;
 
     const currentIndex = team.lineup.indexOf(player.id);
     if (currentIndex >= 0) team.lineup[currentIndex] = null;
@@ -609,12 +610,12 @@ const persistState = saveState;
     });
   }
 
-  function createPlayerChip(player, team) {
+  function createPlayerChip(player, team, context = 'pitch') {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'player-chip';
     chip.draggable = true;
-    chip.dataset.focusKey = `player-${team.id}-${player.id}`;
+    chip.dataset.focusKey = `player-${team.id}-${player.id}-${context}`;
     chip.setAttribute('aria-pressed', String(Boolean(selected && selected.teamId === team.id && selected.playerId === player.id)));
     chip.setAttribute('aria-label', `Seleccionar a ${player.name}, dorsal ${player.number}`);
     chip.title = `#${player.number} ${player.name}`;
@@ -622,7 +623,7 @@ const persistState = saveState;
 
     const number = document.createElement('span');
     number.className = 'shirt-number';
-    number.textContent = player.number;
+    number.textContent = player.number ?? '—';
     const name = document.createElement('span');
     name.className = 'chip-name';
     name.textContent = player.name;
@@ -644,9 +645,16 @@ const persistState = saveState;
 
     chip.addEventListener('click', event => {
       event.stopPropagation();
+      if (context === 'pitch' && selected && selected.teamId === team.id && selected.playerId !== player.id) {
+        movePlayer(team.id, selected.playerId, team.lineup.indexOf(player.id));
+        return;
+      }
       const same = selected && selected.teamId === team.id && selected.playerId === player.id;
       selected = same ? null : { teamId: team.id, playerId: player.id };
       renderTeams();
+      if (!same && matchMedia('(max-width: 700px)').matches) {
+        [...dom.teamsContainer.children].find(card => card.dataset.teamId === String(team.id))?.querySelector('.pitch-export-area').scrollIntoView({ block: 'start' });
+      }
     });
 
     chip.addEventListener('dragstart', event => {
@@ -766,6 +774,11 @@ const persistState = saveState;
 
   function renderTeams() {
     const focusKey = document.activeElement?.dataset.focusKey;
+    // Keep transient UI in the DOM; player status always comes from the lineup.
+    const previousCards = new Map([...dom.teamsContainer.children].map(card => [card.dataset.teamId, {
+      query: card.querySelector('.player-search')?.value || '',
+      details: [...card.querySelectorAll('details')].map(detail => [detail.className, detail.open])
+    }]));
     dom.teamsContainer.innerHTML = '';
     state.teams.forEach(team => {
       const card = dom.teamTemplate.content.firstElementChild.cloneNode(true);
@@ -868,41 +881,85 @@ const persistState = saveState;
         configureTarget(slot, team, index);
       });
 
-      const benchElement = card.querySelector('.bench');
-      if (selected && selected.teamId === team.id) benchElement.classList.add('selected-target');
-      card.querySelector('.bench-count').textContent = `${bench.length} jugadores`;
-      if (!bench.length) {
-        const empty = document.createElement('div');
-        empty.className = 'bench-empty';
-        empty.textContent = members.length ? 'No hay suplentes' : 'No hay jugadores asignados';
-        benchElement.appendChild(empty);
-      } else {
-        bench.forEach(player => benchElement.appendChild(createPlayerChip(player, team)));
+      const previous = previousCards.get(String(team.id));
+      for (const [className, open] of previous?.details || []) {
+        card.getElementsByClassName(className)[0]?.toggleAttribute('open', open);
       }
-      configureTarget(benchElement, team, 'bench');
-      renderNaturalSubs(team, card, bench);
+      if (matchMedia('(min-width: 701px)').matches) {
+        card.querySelector('.players-panel').open = true;
+        card.querySelector('.lineup-tools').open = true;
+      }
+      const selection = selected?.teamId === team.id ? getPlayer(selected.playerId) : null;
+      const selectionBar = card.querySelector('.player-selection');
+      selectionBar.hidden = !selection;
+      card.querySelector('.player-selection-label').textContent = selection ? `#${selection.number ?? '—'} ${selection.name} · Toca una posición para colocarlo.` : '';
+      const removeSelected = card.querySelector('.remove-selected');
+      removeSelected.hidden = !selection || !team.lineup.includes(selection.id);
+      removeSelected.addEventListener('click', () => movePlayer(team.id, selection.id, 'bench'));
+      card.querySelector('.cancel-selection').addEventListener('click', () => { selected = null; renderTeams(); });
 
-      const list = card.querySelector('.team-roster-list');
-      const ordered = [
-        ...team.lineup.map(id => getPlayer(id)).filter(Boolean).map(player => ({ player, status: 'Titular' })),
-        ...bench.map(player => {
-          const starterId = team.naturalSubs.find(pair => pair.substituteId === player.id)?.starterId;
-          const starter = starterId ? getPlayer(starterId) : null;
-          return { player, status: starter ? `Cambio natural de #${starter.number}` : 'Suplente' };
-        })
+      const eligibleIds = new Set(members.map(player => player.id));
+      const unavailable = state.players.filter(player => player.teamIds.includes(team.id) && !eligibleIds.has(player.id));
+      card.querySelector('.players-count').textContent = String(members.length + unavailable.length);
+      const groups = [
+        { label: 'Titulares', status: 'starter', players: team.lineup.map(getPlayer).filter(Boolean) },
+        { label: 'Suplentes', status: 'substitute', players: bench },
+        { label: 'No disponibles · fuera de convocatoria', status: 'unavailable', players: unavailable }
       ];
-      if (!ordered.length) {
-        const item = document.createElement('li');
-        item.textContent = 'Sin jugadores';
-        list.appendChild(item);
-      } else {
-        ordered.forEach(({ player, status }) => {
-          const item = document.createElement('li');
-          item.innerHTML = `<strong></strong> · ${status}`;
-          item.querySelector('strong').textContent = `#${player.number} ${player.name}`;
-          list.appendChild(item);
-        });
+      const normalize = value => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+      for (const group of groups) {
+        if (group.status === 'unavailable' && !group.players.length) continue;
+        const section = document.createElement('section');
+        section.className = `player-group player-group-${group.status}`;
+        const heading = document.createElement('h3');
+        heading.textContent = `${group.label} · ${group.players.length}`;
+        const list = document.createElement('ul');
+        list.className = 'panel-player-list';
+        for (const player of group.players) {
+          const row = document.createElement('li');
+          row.dataset.search = normalize(`${player.name} ${player.number ?? ''}`);
+          const chip = createPlayerChip(player, team, 'panel');
+          chip.disabled = group.status === 'unavailable';
+          chip.draggable = !chip.disabled;
+          chip.setAttribute('aria-label', `${chip.getAttribute('aria-label')} · ${group.label}`);
+          row.appendChild(chip);
+          list.appendChild(row);
+        }
+        section.append(heading, list);
+        if (group.status === 'substitute') {
+          const hint = document.createElement('p');
+          hint.className = 'player-group-empty';
+          hint.textContent = 'Arrastra aquí para enviar al banquillo.';
+          section.appendChild(hint);
+          configureTarget(section, team, 'bench');
+        }
+        if (!group.players.length) {
+          const empty = document.createElement('p');
+          empty.className = 'player-group-empty';
+          empty.textContent = group.status === 'starter' ? 'Todavía no hay titulares.' : 'No hay suplentes.';
+          section.appendChild(empty);
+        }
+        card.querySelector('.player-groups').appendChild(section);
       }
+      const search = card.querySelector('.player-search');
+      search.value = previous?.query || '';
+      const filterPlayers = () => {
+        const query = normalize(search.value).replace(/^#/, '');
+        let visible = 0;
+        card.querySelectorAll('.player-group').forEach(section => {
+          let matches = 0;
+          section.querySelectorAll('li').forEach(row => {
+            row.hidden = !row.dataset.search.includes(query);
+            if (!row.hidden) matches++;
+          });
+          section.hidden = Boolean(query) && !matches;
+          visible += matches;
+        });
+        card.querySelector('.player-search-empty').hidden = !query || visible > 0;
+      };
+      search.addEventListener('input', filterPlayers);
+      filterPlayers();
+      renderNaturalSubs(team, card, bench);
 
       dom.teamsContainer.appendChild(card);
     });
@@ -1210,6 +1267,7 @@ const persistState = saveState;
     setFeedback('Pizarra reiniciada. La plantilla oficial se ha conservado.');
   });
 
+  matchMedia('(min-width: 701px)').addEventListener('change', () => renderTeams());
   render();
   async function loadLineupOptions() {
     const teamId = globalThis.__OGS_TEAM__?.id;

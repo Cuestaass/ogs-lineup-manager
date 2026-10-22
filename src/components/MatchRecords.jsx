@@ -54,12 +54,15 @@ function GoalForm({ match, roster, base, onRecorded, currentGoals, maxGoals }) {
 
 export function MatchDetail({ match, goals, roster, base, onRecorded, rosterError }) {
   const matchGoals = goalsForMatch(goals, match.id);
-  const hasScore = Number.isFinite(match.homeScore) && Number.isFinite(match.awayScore);
-  const teamScore = hasScore ? (match.isHome ? match.homeScore : match.awayScore) : null;
+  const score = value => value == null || value === '' ? null : Number(value);
+  const homeScore = score(match.homeScore ?? match.Resultado1);
+  const awayScore = score(match.awayScore ?? match.Resultado2);
+  const hasScore = Number.isFinite(homeScore) && Number.isFinite(awayScore);
+  const teamScore = hasScore ? (match.isHome === false ? awayScore : homeScore) : null;
   return <details className="match-record">
     <summary><div className="match-record-summary"><span className="match-record-date">{match.date || 'Fecha pendiente'}{match.round != null && <small>Jornada {match.round}</small>}</span><strong>{match.home} <span aria-hidden="true">–</span> {match.away}</strong><span className="match-record-state">Finalizado</span><span className="match-record-open">Ver detalle <span aria-hidden="true">↓</span></span></div></summary>
     <div className="match-record-body">
-      <dl className="match-information"><div><dt>Resultado oficial</dt><dd>Finalizado · {hasScore ? `${match.homeScore} – ${match.awayScore}` : 'marcador no disponible'}</dd></div><div><dt>Hora</dt><dd>{match.time || 'No indicada'}</dd></div><div><dt>Campo</dt><dd>{match.venue || 'No indicado'}</dd></div></dl>
+      <dl className="match-information"><div><dt>Resultado oficial</dt><dd>Finalizado · {hasScore ? `${homeScore} – ${awayScore}` : 'marcador no disponible'}</dd></div><div><dt>Hora</dt><dd>{match.time || 'No indicada'}</dd></div><div><dt>Campo</dt><dd>{match.venue || 'No indicado'}</dd></div></dl>
       {match.observation && <p className="match-observation">{match.observation}</p>}
       <div className="match-statistics" aria-label="Estadísticas del partido">
         <section className="match-stat-section" aria-label="Goles del equipo">

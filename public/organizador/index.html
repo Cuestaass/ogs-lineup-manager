@@ -132,6 +132,9 @@
           <p class="team-meta"></p>
           <div class="lineup-meter"><span class="lineup-total"></span><span class="lineup-caption">Titulares en campo</span></div>
         </div>
+      </div>
+      <details class="lineup-tools">
+        <summary>Herramientas de alineación</summary>
         <div class="team-controls">
           <label>
             <span>Formación</span>
@@ -146,8 +149,6 @@
           <button class="auto-lineup primary">Alinear 7</button>
           <button class="bench-all secondary">Todos al banquillo</button>
         </div>
-      </div>
-
       <div class="export-actions">
         <button class="export-png secondary">Exportar PNG</button>
         <button class="export-pdf secondary">Exportar PDF</button>
@@ -159,8 +160,14 @@
         <button type="button" class="lineup-callup-apply secondary">Usar selección</button>
         <small class="lineup-source-label">Alineables: toda la plantilla + refuerzos temporales</small>
       </div>
+        </details>
 
       <div class="pitch-export-area">
+        <div class="player-selection" role="status" aria-live="polite" hidden>
+          <p class="player-selection-label"></p>
+          <button type="button" class="remove-selected secondary">Enviar al banquillo</button>
+          <button type="button" class="cancel-selection secondary">Cancelar selección</button>
+        </div>
         <div class="pitch" aria-label="Campo de fútbol 7">
           <div class="line halfway"></div>
           <div class="centre-circle"></div>
@@ -176,16 +183,17 @@
           <div class="pitch-slot" data-slot="5"></div>
           <div class="pitch-slot" data-slot="6"></div>
         </div>
-        <div class="bench-section">
-          <div class="bench-heading">
-            <strong>Banquillo</strong>
-            <span class="bench-count"></span>
-          </div>
-          <div class="bench"></div>
-        </div>
       </div>
 
-      <div class="team-notes">
+      <details class="players-panel">
+        <summary>Jugadores <span class="players-count"></span></summary>
+        <div class="players-panel-body">
+          <label class="player-search-label"><span>Buscar jugador</span><input class="player-search" type="search" placeholder="Nombre o dorsal" autocomplete="off"></label>
+          <p class="players-hint">Selecciona un jugador y toca una posición del campo, o arrástralo.</p>
+          <p class="player-search-empty" role="status" hidden>Sin resultados para esta búsqueda.</p>
+          <div class="player-groups"></div>
+          <details class="team-notes">
+            <summary>Cambios naturales</summary>
       <section class="natural-subs-section">
         <div class="natural-subs-heading">
           <div>
@@ -197,11 +205,9 @@
         <div class="natural-subs-list"></div>
       </section>
 
-      <div class="team-list-section">
-        <h3>Lista del equipo</h3>
-        <ol class="team-roster-list"></ol>
-      </div>
-      </div>
+          </details>
+        </div>
+      </details>
     </article>
   </template>
 

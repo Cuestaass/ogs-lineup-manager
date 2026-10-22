@@ -344,6 +344,7 @@ h3 { font-size: 1rem; }
   .app-header { padding-right: 64px; }
   body[data-page="jdm"] .app-header h1 { font-size: 2rem; }
 }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
@@ -687,4 +688,66 @@ body[data-page="tactica"] { background: #10271f; }
   #tactics-board { width: 100%; max-width: none; aspect-ratio: 680 / 1050; }
   .tactics-caption { display: block; padding-inline: 5px; }
   #tactics-status { margin-top: 8px; text-align: left; }
+}
+
+/* Lineup editor: mobile field first, one roster panel at every size. */
+#alineaciones .team-card { display: flex; flex-direction: column; gap: 12px; }
+#alineaciones .team-card-header { order: 0; width: 100%; }
+#alineaciones .pitch-export-area { display: block; order: 1; width: 100%; min-width: 0; scroll-margin-top: 20px; }
+#alineaciones .pitch { width: 100%; aspect-ratio: .73; }
+#alineaciones .players-panel,
+#alineaciones .lineup-tools { width: 100%; min-width: 0; border: 1px solid #607866; background: #213d32; }
+#alineaciones .players-panel { order: 2; }
+#alineaciones .lineup-tools { order: 3; }
+#alineaciones .players-panel > summary,
+#alineaciones .lineup-tools > summary,
+#alineaciones .team-notes > summary {
+  display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 10px 14px;
+  color: inherit; font-weight: 700; cursor: pointer; list-style: none;
+}
+#alineaciones .players-count { margin-left: auto; font-family: var(--number); color: var(--marker); }
+#alineaciones details > summary::-webkit-details-marker { display: none; }
+#alineaciones details > summary::after { content: '+'; margin-left: auto; color: var(--marker); font-size: 1.3rem; }
+#alineaciones details[open] > summary::after { content: '−'; }
+#alineaciones .players-panel-body { padding: 0 12px 14px; }
+#alineaciones .player-search-label { display: grid; gap: 6px; font-size: .8rem; }
+#alineaciones .player-search { width: 100%; min-width: 0; min-height: 44px; font-size: 1rem; }
+#alineaciones .players-hint, #alineaciones .player-search-empty, #alineaciones .player-group-empty { color: var(--muted); font-size: .85rem; line-height: 1.5; }
+#alineaciones .player-group h3 { margin: 18px 0 10px; font-size: .85rem; color: var(--marker); }
+#alineaciones .panel-player-list { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+#alineaciones .panel-player-list li { min-width: 0; }
+#alineaciones .panel-player-list .player-chip { width: 100%; min-height: 48px; }
+#alineaciones .panel-player-list .chip-name { white-space: normal; overflow-wrap: anywhere; text-align: left; }
+#alineaciones .player-group-substitute.drop-active { outline: 2px solid var(--marker); outline-offset: 4px; }
+#alineaciones .player-group-starter .player-chip { border-left: 4px solid var(--marker); }
+#alineaciones .player-group-substitute .player-chip { border-left: 4px solid #a0b7a3; }
+#alineaciones .player-group-unavailable h3 { color: var(--muted); }
+#alineaciones .player-chip:disabled { cursor: default; opacity: .65; }
+#alineaciones .player-selection { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; padding: 12px; border: 1px solid var(--marker); }
+#alineaciones .player-selection-label { flex: 1 0 100%; margin: 0; overflow-wrap: anywhere; font-size: .9rem; }
+#alineaciones .player-selection button { flex: 1 1 auto; min-height: 44px; white-space: normal; }
+#alineaciones .team-notes { display: block; margin: 18px 0 0; padding: 0; min-width: 0; }
+#alineaciones .team-notes > summary::after { color: var(--ink); }
+#alineaciones .team-notes .natural-subs-section { padding: 12px; }
+#alineaciones .team-notes .natural-sub-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+#alineaciones .natural-sub-select { width: 100%; min-width: 0; min-height: 44px; font-size: 1rem; }
+#alineaciones .lineup-tools > :not(summary) { margin-inline: 12px; }
+#alineaciones .lineup-tools .team-controls { display: grid; margin-top: 4px; }
+#alineaciones .lineup-tools .export-actions, #alineaciones .lineup-tools .lineup-callup-controls { margin: 12px; }
+#alineaciones [hidden] { display: none !important; }
+@media (min-width: 701px) {
+  #alineaciones .team-card {
+    display: grid; grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr);
+    grid-template-areas: "head head" "tools tools" "pitch players";
+    align-items: start; gap: 14px clamp(18px, 2vw, 30px);
+  }
+  #alineaciones .team-card-header { grid-area: head; display: flex; align-items: center; }
+  #alineaciones .lineup-tools { grid-area: tools; border: 0; background: transparent; }
+  #alineaciones .lineup-tools > summary { display: none; }
+  #alineaciones .lineup-tools .team-controls { display: flex; flex-wrap: wrap; margin: 0; }
+  #alineaciones .lineup-tools .export-actions { margin: 8px 0; }
+  #alineaciones .lineup-tools .lineup-callup-controls { margin: 8px 0 0; }
+  #alineaciones .pitch-export-area { grid-area: pitch; }
+  #alineaciones .players-panel { grid-area: players; }
+  #alineaciones .team-notes > summary { display: flex; }
 }

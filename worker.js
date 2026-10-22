@@ -300,9 +300,20 @@ async function authenticatedApi(request, env, ctx, url) {
     }
     if (resource === 'matches' && request.method === 'GET') {
       await requirePermission(env, account.userId, teamId, 'goals.record');
-      const team = await env.JDM_DB.prepare('SELECT external_team_slug FROM teams WHERE id=?').bind(teamId).first();
-      const snapshot = team?.external_team_slug ? await env.JDM_DB.prepare('SELECT payload FROM jdm_snapshots WHERE slug=?').bind(team.external_team_slug).first() : null;
-      const matches = snapshot ? (JSON.parse(snapshot.payload).fixtures || []).filter(item => item.status === 'F') : [];
+      const team = await env.JDM_DB.prepare('SELECT name,external_team_slug,external_team_code,external_group_code FROM teams WHERE id=?').bind(teamId).first();
+      let payload = null;
+      if (team?.external_team_slug) {
+        const snapshot = await env.JDM_DB.prepare('SELECT payload FROM jdm_snapshots WHERE slug=?').bind(team.external_team_slug).first();
+        payload = snapshot ? JSON.parse(snapshot.payload) : null;
+        const scoreMissing = (payload?.fixtures || []).some(item => item.status === 'F' && (item.homeScore == null || item.awayScore == null));
+        if (scoreMissing) {
+          try {
+            payload = await fetchTeam({ slug: team.external_team_slug, name: team.name, teamCode: team.external_team_code, groupCode: team.external_group_code });
+            await env.JDM_DB.prepare('INSERT INTO jdm_snapshots(slug,payload,checked_at) VALUES(?,?,?) ON CONFLICT(slug) DO UPDATE SET payload=excluded.payload,checked_at=excluded.checked_at').bind(team.external_team_slug, JSON.stringify(payload), new Date().toISOString()).run();
+          } catch { /* Keep the last snapshot if the official source is temporarily unavailable. */ }
+        }
+      }
+      const matches = (payload?.fixtures || []).filter(item => item.status === 'F');
       const goals = await env.JDM_DB.prepare('SELECT g.id,g.match_id,g.minute,g.created_at,r.display_name player_name FROM match_goals g JOIN roster_players r ON r.id=g.roster_player_id WHERE g.team_id=? ORDER BY g.created_at DESC').bind(teamId).all();
       return json({ matches, goals: goals.results });
     }
@@ -313,13 +324,16 @@ async function authenticatedApi(request, env, ctx, url) {
       const snapshot = team?.external_team_slug ? await env.JDM_DB.prepare('SELECT payload FROM jdm_snapshots WHERE slug=?').bind(team.external_team_slug).first() : null;
       const match = snapshot && JSON.parse(snapshot.payload).fixtures?.find(item => item.id === body.matchId);
       if (!match || match.status !== 'F') return json({ error: 'Los goleadores sólo pueden registrarse cuando el resultado oficial sea definitivo.' }, 409);
-      const teamScore = match.isHome ? match.homeScore : match.awayScore;
-      if (!Number.isSafeInteger(teamScore) || teamScore < 0) return json({ error: 'No se pueden registrar goleadores sin un marcador oficial válido.' }, 409);
+      const homeScore = match.homeScore ?? match.Resultado1;
+      const awayScore = match.awayScore ?? match.Resultado2;
+      const teamScore = match.isHome === false ? awayScore : homeScore;
+      const numericTeamScore = teamScore == null || teamScore === '' ? NaN : Number(teamScore);
+      if (!Number.isSafeInteger(numericTeamScore) || numericTeamScore < 0) return json({ error: 'No se pueden registrar goleadores sin un marcador oficial válido.' }, 409);
       const player = await env.JDM_DB.prepare('SELECT id FROM roster_players WHERE id=? AND team_id=? AND status=?').bind(body.rosterPlayerId, teamId, 'active').first();
       if (!player) return json({ error: 'El goleador no pertenece a la plantilla activa.' }, 400);
       const id = crypto.randomUUID();
-      const inserted = await env.JDM_DB.prepare('INSERT INTO match_goals(id,team_id,match_id,roster_player_id,minute,created_by) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM match_goals WHERE team_id=? AND match_id=?) < ?').bind(id, teamId, body.matchId, player.id, body.minute == null ? null : Number(body.minute), account.userId, teamId, body.matchId, teamScore).run();
-      if (inserted.meta?.changes !== 1) return json({ error: `Ya están registrados los ${teamScore} goles oficiales de nuestro equipo.` }, 409);
+      const inserted = await env.JDM_DB.prepare('INSERT INTO match_goals(id,team_id,match_id,roster_player_id,minute,created_by) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM match_goals WHERE team_id=? AND match_id=?) < ?').bind(id, teamId, body.matchId, player.id, body.minute == null ? null : Number(body.minute), account.userId, teamId, body.matchId, numericTeamScore).run();
+      if (inserted.meta?.changes !== 1) return json({ error: `Ya están registrados los ${numericTeamScore} goles oficiales de nuestro equipo.` }, 409);
       return json({ id }, 201);
     }
   }
