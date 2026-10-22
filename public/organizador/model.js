@@ -106,13 +106,14 @@ export function eligibleTeamPlayers(state, teamId) {
   return state.players.filter(player => player.teamIds.includes(id) && (!selectedRoster || player.origin !== 'roster' || selectedRoster.has(String(player.sourceId))));
 }
 
-export function loadState() {
+export function loadState({ onError = () => {}, onRestore = () => {} } = {}) {
     try {
       let serialized = localStorage.getItem(storageKey());
       const migratingTeam = !serialized && activeTeamId().startsWith('local-') ? Number(activeTeamId().slice(6)) : null;
       if (!serialized && activeTeamId().startsWith('local')) serialized = localStorage.getItem(LEGACY_STORAGE_KEY);
       const parsed = JSON.parse(serialized);
-      if (!parsed || !Array.isArray(parsed.teams) || !parsed.teams.length || !Array.isArray(parsed.players)) return defaultState();
+      if (!serialized) return defaultState();
+      if (!parsed || !Array.isArray(parsed.teams) || !parsed.teams.length || !Array.isArray(parsed.players)) throw new Error('Invalid saved lineup');
       if (migratingTeam) {
         const team = parsed.teams.find(item => item.id === migratingTeam);
         if (!team) return defaultState();
@@ -134,14 +135,44 @@ export function loadState() {
         player.origin ||= 'temporary';
         if (player.sourceId != null) player.sourceId = String(player.sourceId);
       });
+      onRestore();
       return parsed;
-    } catch {
+    } catch (error) {
+      onError(error);
       return defaultState();
     }
   }
 
-export function saveState(state) {
-  localStorage.setItem(storageKey(), JSON.stringify(state));
-  if (activeTeamId() === 'local') localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(state));
+export function saveState(state, key = storageKey()) {
+  localStorage.setItem(key, JSON.stringify(state));
+  // The v2 record is authoritative; failure of the compatibility copy is harmless.
+  if (key === 'ogs-organizer-v2:local') {
+    try { localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(state)); } catch {}
+  }
+}
+
+// Capture the team key once: a team picker must never redirect an outstanding write.
+export function createLineupSaver({ write = saveState, onStatus = () => {}, key = storageKey() } = {}) {
+  let pending = false;
+  let savedSnapshot;
+  return {
+    get pending() { return pending; },
+    save(state) {
+      const snapshot = JSON.stringify(state);
+      if (!pending && snapshot === savedSnapshot) return true;
+      pending = true;
+      onStatus('pending');
+      try {
+        write(state, key);
+        savedSnapshot = snapshot;
+        pending = false;
+        onStatus('saved');
+        return true;
+      } catch {
+        onStatus('error');
+        return false;
+      }
+    }
+  };
 }
 

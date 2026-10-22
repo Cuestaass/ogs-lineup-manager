@@ -61,3 +61,60 @@ test('combina la plantilla persistente con refuerzos temporales y filtra por con
   syncRosterPlayers(state, [{ id: 'roster-1', display_name: 'Convocado actualizado', number: 10 }]);
   assert.deepEqual(state.players.map(player => player.name), ['Convocado actualizado', 'Refuerzo']);
 });
+
+test('un fallo de almacenamiento mantiene los cambios pendientes hasta reintentar', async () => {
+  const { createLineupSaver } = await import('../public/organizador/model.js');
+  const statuses = [];
+  let blocked = true;
+  let stored;
+  const saver = createLineupSaver({ write: state => {
+    if (blocked) throw new Error('QuotaExceededError');
+    stored = structuredClone(state);
+  }, onStatus: status => statuses.push(status) });
+  const state = defaultState();
+  assert.equal(saver.save(state), false);
+  assert.equal(saver.pending, true);
+  assert.deepEqual(statuses, ['pending', 'error']);
+  state.teams[0].formation = '231';
+  blocked = false;
+  assert.equal(saver.save(state), true);
+  assert.equal(saver.pending, false);
+  assert.equal(stored.teams[0].formation, '231');
+  assert.equal(statuses.at(-1), 'saved');
+});
+
+test('el guardado captura el equipo original aunque cambie el equipo activo', async () => {
+  const { createLineupSaver } = await import('../public/organizador/model.js');
+  const records = new Map();
+  globalThis.localStorage = { getItem: key => records.get(key) ?? null, setItem: (key, value) => records.set(key, value) };
+  try {
+    globalThis.__OGS_TEAM__ = { id: 'team-a' };
+    const saver = createLineupSaver();
+    const state = defaultState();
+    state.teams[0].formation = '222';
+    globalThis.__OGS_TEAM__ = { id: 'team-b' };
+    saver.save(state);
+    assert.equal(records.has('ogs-organizer-v2:team-b'), false);
+    assert.equal(loadState().teams[0].formation, '321');
+    globalThis.__OGS_TEAM__ = { id: 'team-a' };
+    assert.equal(loadState().teams[0].formation, '222');
+  } finally {
+    delete globalThis.__OGS_TEAM__;
+    delete globalThis.localStorage;
+  }
+});
+
+test('distingue un registro ilegible de uno vacío sin borrar la copia anterior', () => {
+  let errors = 0;
+  globalThis.localStorage = { getItem: () => '{invalid', setItem: () => assert.fail('no debe escribir') };
+  try {
+    loadState({ onError: () => errors++ });
+    assert.equal(errors, 1);
+    globalThis.localStorage.getItem = () => { throw new Error('SecurityError'); };
+    loadState({ onError: () => errors++ });
+    assert.equal(errors, 2);
+    globalThis.localStorage.getItem = () => null;
+    loadState({ onError: () => errors++ });
+    assert.equal(errors, 2);
+  } finally { delete globalThis.localStorage; }
+});

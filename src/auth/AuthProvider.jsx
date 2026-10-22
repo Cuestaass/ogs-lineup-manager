@@ -50,10 +50,13 @@ export function AuthProvider({ children }) {
     account,
     activeTeam: account?.teams.find(team => team.id === localStorage.getItem(ACTIVE_TEAM_KEY)) || account?.teams[0] || null,
     selectTeam(teamId) {
+      if (!account?.teams.some(team => team.id === teamId)) return;
+      if (window.__OGS_BEFORE_LEAVE__ && !window.__OGS_BEFORE_LEAVE__()) return;
       localStorage.setItem(ACTIVE_TEAM_KEY, teamId);
       location.reload();
     },
     async logout() {
+      if (window.__OGS_BEFORE_LEAVE__ && !window.__OGS_BEFORE_LEAVE__()) return;
       await clearSession();
       location.replace('/login/');
     }

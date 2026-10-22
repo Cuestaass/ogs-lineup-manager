@@ -806,3 +806,17 @@ body[data-page="tactica"] { background: #10271f; }
  #alineaciones .team-card { display: flex; }
  #alineaciones .pitch-export-area { width: min(100%, 760px); }
 }
+
+/* Local save feedback stays compact and wraps before the pitch on phones. */
+.lineup-save { display: flex; flex-direction: column; align-items: stretch; gap: 10px; min-width: 0; margin-bottom: 16px; padding: 12px; border: 1px solid var(--border); border-left: 3px solid var(--muted); background: var(--panel); overflow-wrap: anywhere; }
+.lineup-save > div { min-width: 0; }
+.lineup-save strong { font-size: .95rem; }
+.lineup-save p { margin: 4px 0 0; color: var(--muted); font-size: .85rem; line-height: 1.4; }
+.lineup-save button { min-height: 44px; white-space: normal; }
+.lineup-save button[hidden] { display: none; }
+.lineup-save[data-state="saved"], .lineup-save[data-state="restored"] { border-left-color: var(--marker); }
+.lineup-save[data-state="error"], .lineup-save[data-state="unreadable"], .lineup-save[data-state="pending"] { border-left-color: var(--accent); }
+@media (min-width: 768px) {
+  .lineup-save { flex-direction: row; align-items: center; justify-content: space-between; }
+  .lineup-save button { flex-shrink: 0; }
+}

@@ -108,13 +108,14 @@ function eligibleTeamPlayers(state, teamId) {
   return state.players.filter(player => player.teamIds.includes(id) && (!selectedRoster || player.origin !== 'roster' || selectedRoster.has(String(player.sourceId))));
 }
 
-function loadState() {
+function loadState({ onError = () => {}, onRestore = () => {} } = {}) {
     try {
       let serialized = localStorage.getItem(storageKey());
       const migratingTeam = !serialized && activeTeamId().startsWith('local-') ? Number(activeTeamId().slice(6)) : null;
       if (!serialized && activeTeamId().startsWith('local')) serialized = localStorage.getItem(LEGACY_STORAGE_KEY);
       const parsed = JSON.parse(serialized);
-      if (!parsed || !Array.isArray(parsed.teams) || !parsed.teams.length || !Array.isArray(parsed.players)) return defaultState();
+      if (!serialized) return defaultState();
+      if (!parsed || !Array.isArray(parsed.teams) || !parsed.teams.length || !Array.isArray(parsed.players)) throw new Error('Invalid saved lineup');
       if (migratingTeam) {
         const team = parsed.teams.find(item => item.id === migratingTeam);
         if (!team) return defaultState();
@@ -136,15 +137,45 @@ function loadState() {
         player.origin ||= 'temporary';
         if (player.sourceId != null) player.sourceId = String(player.sourceId);
       });
+      onRestore();
       return parsed;
-    } catch {
+    } catch (error) {
+      onError(error);
       return defaultState();
     }
   }
 
-function saveState(state) {
-  localStorage.setItem(storageKey(), JSON.stringify(state));
-  if (activeTeamId() === 'local') localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(state));
+function saveState(state, key = storageKey()) {
+  localStorage.setItem(key, JSON.stringify(state));
+  // The v2 record is authoritative; failure of the compatibility copy is harmless.
+  if (key === 'ogs-organizer-v2:local') {
+    try { localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(state)); } catch {}
+  }
+}
+
+// Capture the team key once: a team picker must never redirect an outstanding write.
+function createLineupSaver({ write = saveState, onStatus = () => {}, key = storageKey() } = {}) {
+  let pending = false;
+  let savedSnapshot;
+  return {
+    get pending() { return pending; },
+    save(state) {
+      const snapshot = JSON.stringify(state);
+      if (!pending && snapshot === savedSnapshot) return true;
+      pending = true;
+      onStatus('pending');
+      try {
+        write(state, key);
+        savedSnapshot = snapshot;
+        pending = false;
+        onStatus('saved');
+        return true;
+      } catch {
+        onStatus('error');
+        return false;
+      }
+    }
+  };
 }
 
 
@@ -227,10 +258,11 @@ function normalizePlayerName(value) {
   }
 
 
-const persistState = saveState;
 
 (() => {
-  let state = loadState();
+  let loadFailed = false;
+  let restored = false;
+  let state = loadState({ onError: () => { loadFailed = true; }, onRestore: () => { restored = true; } });
   let selected = null;
   let dragged = null;
   let lineupOptions = { roster: [], callups: [] };
@@ -263,9 +295,48 @@ const persistState = saveState;
     managementPanel.showModal();
   }));
 
-  function saveState() {
-    persistState(state);
+  const savePanel = document.getElementById('lineup-save');
+  const saveLabel = document.getElementById('lineup-save-label');
+  const saveHint = document.getElementById('lineup-save-hint');
+  const retrySave = document.getElementById('lineup-save-retry');
+  function showSaveStatus(status) {
+    savePanel.dataset.state = status;
+    saveLabel.textContent = {
+      ready: 'Guardado automático local', restored: 'Última alineación recuperada',
+      pending: 'Cambios pendientes de guardar', saved: 'Guardado en este navegador',
+      error: 'Cambios pendientes · No se pudo guardar', unreadable: 'No se pudo recuperar la alineación'
+    }[status];
+    saveHint.textContent = status === 'error'
+      ? 'Los cambios siguen en esta página. Reintenta antes de salir o cambiar de equipo.'
+      : status === 'unreadable'
+        ? 'El guardado está detenido para proteger la copia anterior. Recarga antes de editar.'
+        : status === 'saved'
+          ? `Guardado a las ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}. Solo en este dispositivo y navegador.`
+          : 'Los cambios se guardan automáticamente aquí, por equipo. No se comparten entre dispositivos.';
+    retrySave.hidden = status !== 'error' && status !== 'unreadable';
+    retrySave.textContent = status === 'unreadable' ? 'Volver a cargar' : 'Reintentar guardado';
   }
+  const saver = createLineupSaver({ onStatus: showSaveStatus });
+  function saveState() {
+    if (loadFailed) return false;
+    return saver.save(state);
+  }
+  showSaveStatus(loadFailed ? 'unreadable' : restored ? 'restored' : 'ready');
+  retrySave.addEventListener('click', () => loadFailed ? location.reload() : saveState());
+  let leavingConfirmed = false;
+  window.addEventListener('beforeunload', event => {
+    if (!saver.pending || leavingConfirmed) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && saver.pending) saveState();
+  });
+  window.__OGS_BEFORE_LEAVE__ = () => {
+    if (!saver.pending || saveState()) return true;
+    leavingConfirmed = confirm('Hay cambios sin guardar en esta alineación. ¿Salir y perder esos cambios?');
+    return leavingConfirmed;
+  };
 
   let feedbackTimer;
   function setFeedback(message) {
@@ -797,6 +868,10 @@ const persistState = saveState;
 
       const nameInput = card.querySelector('.team-name-input');
       nameInput.value = team.name;
+      nameInput.addEventListener('input', () => {
+        team.name = nameInput.value;
+        saveState();
+      });
       nameInput.addEventListener('change', () => {
         team.name = nameInput.value.trim() || getSuggestedTeamName();
         saveState();
@@ -993,6 +1068,12 @@ const persistState = saveState;
     renderSummary();
     renderPlayers();
     renderTeams();
+    if (loadFailed) {
+      dom.teamsContainer.inert = true;
+      managementPanel.inert = true;
+      document.getElementById('open-management').disabled = true;
+      dom.clearAll.disabled = true;
+    }
     dom.exportAllPng.disabled = !state.teams.length;
     dom.exportAllPdf.disabled = !state.teams.length;
   }

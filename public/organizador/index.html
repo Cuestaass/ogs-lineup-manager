@@ -38,6 +38,13 @@
         </div>
       </div>
       <p id="lineup-empty" class="lineup-empty" hidden>Tu pizarra está lista. <a href="#altas">Añade jugadores o importa una ficha PDF</a> para preparar el primer siete.</p>
+      <div id="lineup-save" class="lineup-save" data-state="ready">
+        <div role="status" aria-live="polite" aria-atomic="true">
+          <strong id="lineup-save-label">Guardado automático local</strong>
+          <p id="lineup-save-hint">Los cambios se guardan en este navegador, por equipo.</p>
+        </div>
+        <button id="lineup-save-retry" type="button" class="secondary" hidden>Reintentar guardado</button>
+      </div>
       <div id="teams-container" class="teams-grid"></div>
     </section>
     <section class="manage-entry" id="altas" aria-labelledby="altas-title">

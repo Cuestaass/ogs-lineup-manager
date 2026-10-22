@@ -1,8 +1,10 @@
-import { applyCallupToTeam, eligibleTeamPlayers, formations, defaultState, loadState, saveState as persistState, syncRosterPlayers } from './organizador/model.js';
+import { applyCallupToTeam, createLineupSaver, eligibleTeamPlayers, formations, defaultState, loadState, syncRosterPlayers } from './organizador/model.js';
 import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organizador/pdf-import.js';
 
 (() => {
-  let state = loadState();
+  let loadFailed = false;
+  let restored = false;
+  let state = loadState({ onError: () => { loadFailed = true; }, onRestore: () => { restored = true; } });
   let selected = null;
   let dragged = null;
   let lineupOptions = { roster: [], callups: [] };
@@ -35,9 +37,48 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
     managementPanel.showModal();
   }));
 
-  function saveState() {
-    persistState(state);
+  const savePanel = document.getElementById('lineup-save');
+  const saveLabel = document.getElementById('lineup-save-label');
+  const saveHint = document.getElementById('lineup-save-hint');
+  const retrySave = document.getElementById('lineup-save-retry');
+  function showSaveStatus(status) {
+    savePanel.dataset.state = status;
+    saveLabel.textContent = {
+      ready: 'Guardado automático local', restored: 'Última alineación recuperada',
+      pending: 'Cambios pendientes de guardar', saved: 'Guardado en este navegador',
+      error: 'Cambios pendientes · No se pudo guardar', unreadable: 'No se pudo recuperar la alineación'
+    }[status];
+    saveHint.textContent = status === 'error'
+      ? 'Los cambios siguen en esta página. Reintenta antes de salir o cambiar de equipo.'
+      : status === 'unreadable'
+        ? 'El guardado está detenido para proteger la copia anterior. Recarga antes de editar.'
+        : status === 'saved'
+          ? `Guardado a las ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}. Solo en este dispositivo y navegador.`
+          : 'Los cambios se guardan automáticamente aquí, por equipo. No se comparten entre dispositivos.';
+    retrySave.hidden = status !== 'error' && status !== 'unreadable';
+    retrySave.textContent = status === 'unreadable' ? 'Volver a cargar' : 'Reintentar guardado';
   }
+  const saver = createLineupSaver({ onStatus: showSaveStatus });
+  function saveState() {
+    if (loadFailed) return false;
+    return saver.save(state);
+  }
+  showSaveStatus(loadFailed ? 'unreadable' : restored ? 'restored' : 'ready');
+  retrySave.addEventListener('click', () => loadFailed ? location.reload() : saveState());
+  let leavingConfirmed = false;
+  window.addEventListener('beforeunload', event => {
+    if (!saver.pending || leavingConfirmed) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && saver.pending) saveState();
+  });
+  window.__OGS_BEFORE_LEAVE__ = () => {
+    if (!saver.pending || saveState()) return true;
+    leavingConfirmed = confirm('Hay cambios sin guardar en esta alineación. ¿Salir y perder esos cambios?');
+    return leavingConfirmed;
+  };
 
   let feedbackTimer;
   function setFeedback(message) {
@@ -569,6 +610,10 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
 
       const nameInput = card.querySelector('.team-name-input');
       nameInput.value = team.name;
+      nameInput.addEventListener('input', () => {
+        team.name = nameInput.value;
+        saveState();
+      });
       nameInput.addEventListener('change', () => {
         team.name = nameInput.value.trim() || getSuggestedTeamName();
         saveState();
@@ -765,6 +810,12 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
     renderSummary();
     renderPlayers();
     renderTeams();
+    if (loadFailed) {
+      dom.teamsContainer.inert = true;
+      managementPanel.inert = true;
+      document.getElementById('open-management').disabled = true;
+      dom.clearAll.disabled = true;
+    }
     dom.exportAllPng.disabled = !state.teams.length;
     dom.exportAllPdf.disabled = !state.teams.length;
   }
