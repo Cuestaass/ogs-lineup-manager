@@ -198,6 +198,32 @@ h3 { font-size: 1rem; }
 .inline-form label { flex: 1; min-width: 0; }
 .player-creator { border-top-color: var(--border); margin-top: 24px; }
 .player-creator h2 { font-size: 1.3rem; }
+.manage-entry { display: grid; justify-items: start; gap: 8px; margin-top: 42px; padding: 22px 0; border-top: 1px solid var(--text); border-bottom: 1px solid var(--border); }
+.manage-entry h2, .manage-entry p { margin: 0; }
+.manage-entry > p:not(.eyebrow) { color: var(--muted); font-size: .85rem; }
+.manage-entry button { margin-top: 8px; }
+.management-panel { position: fixed; inset: 0 0 0 auto; width: min(100%, 520px); max-width: 100%; height: 100dvh; max-height: 100dvh; margin: 0; padding: 0; border: 0; border-left: 1px solid var(--border); background: var(--panel); color: var(--text); box-shadow: -18px 0 48px #10271f30; overflow: auto; }
+.management-panel::backdrop { background: #10271f99; }
+.management-panel-inner { padding: clamp(18px, 4vw, 32px); }
+.management-header { position: sticky; top: 0; z-index: 2; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 0 0 20px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.management-header h2 { margin: 0; }
+.management-close { flex: none; }
+.management-panel .team-creator, .management-panel .player-creator, .management-panel .import-roster { display: block; margin: 0; padding: 22px 0; border-bottom: 1px solid var(--border); }
+.management-panel h3 { margin: 0 0 8px; font-family: var(--display); font-size: 1.35rem; font-weight: 500; }
+.management-panel .inline-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; margin-top: 14px; }
+.management-panel .player-form-grid { grid-template-columns: minmax(0, 1fr) minmax(90px, .45fr); gap: 12px; }
+.management-panel .player-form-grid > * { min-width: 0; }
+.management-panel .team-checkboxes, .management-panel .player-form-grid > button { grid-column: 1 / -1; }
+.management-panel .import-roster { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.danger-zone { margin-top: 14px; padding: 10px 0; border-top: 1px solid #a35a4d; }
+.danger-zone summary { min-height: 44px; display: flex; align-items: center; color: #ffd0bd; cursor: pointer; font-size: .77rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.danger-zone p { margin: 4px 12px 8px; color: #d5dfd0; font-size: .78rem; }
+.danger-zone .delete-team { margin: 0 12px 8px; min-height: 46px; }
+@media (max-width: 600px) {
+  .management-panel { inset: auto 0 0; width: 100%; height: min(92dvh, 850px); max-height: 92dvh; border: 1px solid var(--border); border-bottom: 0; box-shadow: 0 -18px 48px #10271f30; }
+  .management-panel-inner { padding: max(18px, env(safe-area-inset-top)) max(16px, var(--gutter)) max(22px, env(safe-area-inset-bottom)); }
+  .management-panel .inline-form { grid-template-columns: minmax(0, 1fr); }
+}
 .player-form-grid { display: grid; grid-template-columns: minmax(150px, 1.5fr) 125px minmax(180px, 1fr) auto; align-items: flex-end; gap: 16px; margin-top: 20px; }
 .team-checkboxes { min-width: 0; padding: 0; margin: 0; border: 0; }
 .checkbox-row { display: flex; flex-wrap: wrap; gap: 6px 14px; }

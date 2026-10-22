@@ -255,6 +255,13 @@ const persistState = saveState;
     importRosterDropZone: document.getElementById('import-roster-drop-zone'),
     importRosterFileName: document.getElementById('import-roster-file-name')
   };
+  const managementPanel = document.getElementById('management-panel');
+  document.getElementById('open-management')?.addEventListener('click', () => managementPanel.showModal());
+  document.getElementById('close-management')?.addEventListener('click', () => managementPanel.close());
+  document.querySelectorAll('a[href="#altas"]').forEach(link => link.addEventListener('click', event => {
+    event.preventDefault();
+    managementPanel.showModal();
+  }));
 
   function saveState() {
     persistState(state);
@@ -783,6 +790,7 @@ const persistState = saveState;
     state.teams.forEach(team => {
       const card = dom.teamTemplate.content.firstElementChild.cloneNode(true);
       card.dataset.teamId = team.id;
+      card.dataset.teamId = team.id;
       for (const control of card.querySelectorAll('input, select, button')) {
         control.dataset.focusKey = `${team.id}-${control.classList[0]}`;
       }
@@ -825,6 +833,15 @@ const persistState = saveState;
       card.querySelector('.lineup-source-label').textContent = activeCallup ? `Alineables: ${activeCallup.title} + refuerzos temporales` : 'Alineables: toda la plantilla + refuerzos temporales';
 
       const formationSelect = card.querySelector('.formation-select');
+      const activeTeamSelect = card.querySelector('.active-team-select');
+      for (const optionTeam of state.teams) {
+        const option = document.createElement('option'); option.value = optionTeam.id; option.textContent = optionTeam.name;
+        activeTeamSelect.appendChild(option);
+      }
+      activeTeamSelect.value = team.id;
+      activeTeamSelect.addEventListener('change', () => {
+        document.querySelector(`.team-card[data-team-id="${CSS.escape(activeTeamSelect.value)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
       formationSelect.value = team.formation;
       formationSelect.addEventListener('change', () => {
         team.formation = formationSelect.value;

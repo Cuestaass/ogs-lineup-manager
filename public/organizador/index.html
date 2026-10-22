@@ -40,60 +40,47 @@
       <p id="lineup-empty" class="lineup-empty" hidden>Tu pizarra está lista. <a href="#altas">Añade jugadores o importa una ficha PDF</a> para preparar el primer siete.</p>
       <div id="teams-container" class="teams-grid"></div>
     </section>
-    <section class="panel team-creator" id="altas" aria-labelledby="altas-title">
-      <div>
-        <p class="eyebrow">02 / ALTAS E IMPORTACIÓN</p><h2 id="altas-title">Amplía tu equipo</h2>
-        <p>Añade refuerzos puntuales a esta pizarra sin modificar la plantilla oficial del equipo.</p>
-      </div>
-      <div class="inline-form">
-        <label>
-          <span>Nombre del nuevo equipo</span>
-          <input id="new-team-name" type="text" placeholder="Ej. FC OGS C" maxlength="40">
-        </label>
-        <button id="add-team" class="primary">Añadir equipo</button>
-      </div>
+    <section class="manage-entry" id="altas" aria-labelledby="altas-title">
+      <p class="eyebrow">02 / ALTAS E IMPORTACIÓN</p>
+      <h2 id="altas-title">Amplía tu equipo</h2>
+      <p>Añade refuerzos puntuales a esta pizarra sin modificar la plantilla oficial.</p>
+      <button id="open-management" class="primary">Gestionar jugadores y equipos</button>
     </section>
 
-    <section class="panel player-creator">
-      <div>
-        <h2>Refuerzo temporal</h2>
-        <p>Estará disponible en esta alineación, pero no se añadirá de forma persistente a “Mi equipo”. El dorsal se asigna automáticamente cuando se deja vacío.</p>
+    <dialog id="management-panel" class="management-panel" aria-labelledby="management-title">
+      <div class="management-panel-inner">
+        <header class="management-header">
+          <div><p class="eyebrow">02 / ALTAS E IMPORTACIÓN</p><h2 id="management-title">Gestionar plantilla</h2></div>
+          <button id="close-management" class="management-close" type="button" aria-label="Cerrar panel">Cerrar</button>
+        </header>
+        <section class="team-creator" aria-labelledby="create-team-title">
+          <h3 id="create-team-title">Crear equipo</h3>
+          <div class="inline-form">
+            <label><span>Nombre del nuevo equipo</span><input id="new-team-name" type="text" placeholder="Ej. FC OGS C" maxlength="40"></label>
+            <button id="add-team" class="primary">Añadir equipo</button>
+          </div>
+        </section>
+        <section class="player-creator" aria-labelledby="temporary-player-title">
+          <h3 id="temporary-player-title">Refuerzo temporal</h3>
+          <p>Estará disponible en esta alineación, pero no se añadirá de forma persistente a “Mi equipo”. El dorsal se asigna automáticamente cuando se deja vacío.</p>
+          <div class="player-form-grid">
+            <label><span>Nombre</span><input id="new-player-name" type="text" placeholder="Nombre del jugador" maxlength="40"></label>
+            <label><span>Dorsal opcional</span><input id="new-player-number" type="number" min="1" max="999" placeholder="Automático"></label>
+            <fieldset id="new-player-teams" class="team-checkboxes"><legend>Asignar a equipos</legend></fieldset>
+            <button id="add-player" class="primary">Añadir jugador</button>
+          </div>
+        </section>
+        <section class="import-roster" aria-labelledby="import-title">
+          <div><strong id="import-title">Importar ficha de equipo</strong><p>Sube el PDF de inscripción para crear el equipo y añadir sus deportistas al banquillo.</p></div>
+          <label class="file-drop-zone" id="import-roster-drop-zone">
+            <input id="import-roster-file" class="file-drop-input" type="file" accept="application/pdf,.pdf" aria-describedby="import-roster-hint">
+            <span class="file-drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 3v11m0 0 4-4m-4 4-4-4M4 16v4h16v-4" /></svg><span class="file-format-badge">PDF</span></span>
+            <span class="file-drop-copy"><strong id="import-roster-file-name">Arrastra la ficha PDF aquí</strong><span id="import-roster-hint">o haz clic para buscarla en tu dispositivo</span></span>
+          </label>
+        </section>
+        <p id="feedback" class="feedback" aria-live="polite"></p>
       </div>
-      <div class="player-form-grid">
-        <label>
-          <span>Nombre</span>
-          <input id="new-player-name" type="text" placeholder="Nombre del jugador" maxlength="40">
-        </label>
-        <label>
-          <span>Dorsal opcional</span>
-          <input id="new-player-number" type="number" min="1" max="999" placeholder="Automático">
-        </label>
-        <fieldset id="new-player-teams" class="team-checkboxes">
-          <legend>Asignar a equipos</legend>
-        </fieldset>
-        <button id="add-player" class="primary">Añadir jugador</button>
-      </div>
-      <div class="import-roster">
-        <div>
-          <strong>Importar ficha de equipo</strong>
-          <p>Sube el PDF de inscripción para crear el equipo y añadir sus deportistas al banquillo.</p>
-        </div>
-        <label class="file-drop-zone" id="import-roster-drop-zone">
-          <input id="import-roster-file" class="file-drop-input" type="file" accept="application/pdf,.pdf" aria-describedby="import-roster-hint">
-          <span class="file-drop-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" focusable="false">
-              <path d="M12 3v11m0 0 4-4m-4 4-4-4M4 16v4h16v-4" />
-            </svg>
-            <span class="file-format-badge">PDF</span>
-          </span>
-          <span class="file-drop-copy">
-            <strong id="import-roster-file-name">Arrastra la ficha PDF aquí</strong>
-            <span id="import-roster-hint">o haz clic para buscarla en tu dispositivo</span>
-          </span>
-        </label>
-      </div>
-      <p id="feedback" class="feedback" aria-live="polite"></p>
-    </section>
+    </dialog>
 
 
     <section class="panel roster-section" id="plantilla" aria-labelledby="plantilla-title">
@@ -139,7 +126,7 @@
             <button class="auto-lineup primary">Alinear 7</button><button class="bench-all secondary">Todos al banquillo</button>
             <details class="export-actions"><summary>Exportar</summary><button class="export-png secondary">PNG</button><button class="export-pdf secondary">PDF</button></details>
           </div>
-          <button class="delete-team danger ghost">Eliminar equipo</button>
+          <details class="danger-zone"><summary>Acciones peligrosas</summary><p>Eliminar este equipo lo quitará de la pizarra. Sus jugadores se conservarán.</p><button class="delete-team danger ghost">Eliminar equipo</button></details>
           <div class="lineup-callup-controls">
             <label><span>Jugadores alineables</span><select class="lineup-callup-select"><option value="">Toda la plantilla</option></select></label>
             <button type="button" class="lineup-callup-apply secondary">Usar selección</button>

@@ -27,6 +27,13 @@ import { extractPdfRecords, groupPdfRows, normalizePlayerName } from './organiza
     importRosterDropZone: document.getElementById('import-roster-drop-zone'),
     importRosterFileName: document.getElementById('import-roster-file-name')
   };
+  const managementPanel = document.getElementById('management-panel');
+  document.getElementById('open-management')?.addEventListener('click', () => managementPanel.showModal());
+  document.getElementById('close-management')?.addEventListener('click', () => managementPanel.close());
+  document.querySelectorAll('a[href="#altas"]').forEach(link => link.addEventListener('click', event => {
+    event.preventDefault();
+    managementPanel.showModal();
+  }));
 
   function saveState() {
     persistState(state);
